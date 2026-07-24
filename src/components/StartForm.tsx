@@ -36,6 +36,7 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           kind: "journey",
+          tier: "self_serve",
           draft: {
             you: { name: form.you.trim(), email: form.youEmail.trim() },
             partner: { name: form.partner.trim(), email: form.partnerEmail.trim() },
@@ -105,8 +106,8 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
         {loading ? "Taking you to checkout…" : `Begin the journey · ${priceLabel}`}
       </button>
       <p className="text-center text-xs leading-relaxed text-ink-soft">
-        Six months, paid once — no subscription, nothing to cancel. You can add more time later if
-        you need it.
+        Paid once — no subscription, nothing to cancel. You can add more time later if you need
+        it.
       </p>
     </form>
   );

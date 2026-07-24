@@ -8,7 +8,10 @@ type Props = {
   needsDetails: boolean;
   awaitingPayment: boolean;
   signedInAs: string;
-  months: number;
+  windowLabel: string;
+  /// True for a tier that runs until the due date — the date they enter here is
+  /// what decides when it ends, so it stops being an optional detail.
+  dueDateMatters: boolean;
   giftFrom?: string | null;
   giftMessage?: string | null;
 };
@@ -18,7 +21,8 @@ export default function RedeemPanel({
   needsDetails,
   awaitingPayment,
   signedInAs,
-  months,
+  windowLabel,
+  dueDateMatters,
   giftFrom,
   giftMessage,
 }: Props) {
@@ -32,6 +36,7 @@ export default function RedeemPanel({
     partnerEmail: "",
     babyLabel: "",
     lastName: "",
+    dueDate: "",
   });
 
   function set<K extends keyof typeof form>(k: K, v: string) {
@@ -72,6 +77,7 @@ export default function RedeemPanel({
                 partner: { name: form.partner.trim(), email: form.partnerEmail.trim() },
                 babyLabel: form.babyLabel.trim(),
                 lastName: form.lastName.trim(),
+                dueDate: form.dueDate || undefined,
               }
             : undefined,
         }),
@@ -103,8 +109,8 @@ export default function RedeemPanel({
     <div>
       {giftFrom && (
         <p className="text-sm leading-relaxed text-ink-soft">
-          <span className="font-semibold text-ink">{giftFrom}</span> gave you {months} months of
-          Namesake.
+          <span className="font-semibold text-ink">{giftFrom}</span> gave you Namesake —{" "}
+          {windowLabel}.
         </p>
       )}
       {giftMessage && (
@@ -144,17 +150,32 @@ export default function RedeemPanel({
               placeholder="Rivera"
             />
           </div>
-          <Field
-            label="What you call the bump"
-            hint="optional"
-            value={form.babyLabel}
-            onChange={(v) => set("babyLabel", v)}
-            placeholder="Peanut"
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              label="What you call the bump"
+              hint="optional"
+              value={form.babyLabel}
+              onChange={(v) => set("babyLabel", v)}
+              placeholder="Peanut"
+            />
+            <Field
+              label="Due date"
+              hint={dueDateMatters ? "sets how long you have" : "optional"}
+              type="date"
+              value={form.dueDate}
+              onChange={(v) => set("dueDate", v)}
+            />
+          </div>
+          {dueDateMatters && !form.dueDate && (
+            <p className="text-xs leading-relaxed text-ink-soft">
+              This gift runs until your due date. Without one we&apos;ll give you nine months from
+              today — you can always add more time later.
+            </p>
+          )}
         </div>
       ) : (
         <p className="mt-3 text-sm leading-relaxed text-ink-soft">
-          Everything&apos;s paid for — {months} months, starting the moment you open it.
+          Everything&apos;s paid for — {windowLabel}, starting the moment you open it.
         </p>
       )}
 

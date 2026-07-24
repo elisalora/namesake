@@ -1,6 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-const MODEL = process.env.NAMESAKE_MODEL || "claude-opus-4-8";
+// Inference is the main variable cost per journey, and the two calls this file
+// makes are not the same job. The consultant is the product — it needs warmth
+// and judgement, and it's what people are paying for. Name enrichment is a
+// reference lookup returning a few words of JSON, where a smaller model is
+// indistinguishable and costs a fraction. Both are overridable.
+const CHAT_MODEL = process.env.NAMESAKE_MODEL || "claude-sonnet-5";
+const ENRICH_MODEL = process.env.NAMESAKE_ENRICH_MODEL || "claude-haiku-4-5";
 
 export function hasApiKey(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
@@ -93,7 +99,7 @@ export async function enrichName(
   const client = new Anthropic();
   try {
     const res = await client.messages.create({
-      model: MODEL,
+      model: ENRICH_MODEL,
       max_tokens: 200,
       system:
         'You are a concise baby-name reference. For the given first name, reply ONLY with compact JSON: {"origin": string, "meaning": string, "gender": "girl"|"boy"|"neutral"}. Keep origin to 1-3 words (e.g. "Greek", "Old English"). Keep meaning under 8 words, warm and plain. If unknown, use your best scholarly guess. No prose, no markdown.',
@@ -130,7 +136,7 @@ export async function* streamConsultant(
 
   const client = new Anthropic();
   const stream = client.messages.stream({
-    model: MODEL,
+    model: CHAT_MODEL,
     max_tokens: 1200,
     system: buildSystemPrompt(ctx),
     messages: history.map((t) => ({ role: t.role, content: t.content })),

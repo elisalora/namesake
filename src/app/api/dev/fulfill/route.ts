@@ -25,6 +25,18 @@ export async function POST(request: Request) {
   const result = await fulfillPurchase({
     purchaseId: parsed.data.purchaseId,
     stripeSessionId: `sim_${parsed.data.purchaseId}`,
+    // Stand in for the address Stripe would have collected, so the orders view
+    // has something realistic to render.
+    shipping: {
+      name: "Simulated Recipient",
+      address: {
+        line1: "1 Test Street",
+        city: "Portland",
+        state: "OR",
+        postal_code: "97201",
+        country: "US",
+      },
+    },
     origin: originFrom(request),
   });
 

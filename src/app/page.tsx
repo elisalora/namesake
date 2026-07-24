@@ -1,9 +1,9 @@
 import Link from "next/link";
 import StartForm from "@/components/StartForm";
-import { PLANS, formatPrice } from "@/lib/pricing";
+import { TIERS, formatPrice, describeWindow } from "@/lib/pricing";
 
 export default function Home() {
-  const plan = PLANS.journey;
+  const plan = TIERS.self_serve;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-10">
@@ -55,11 +55,29 @@ export default function Home() {
         <section className="animate-rise rounded-3xl border border-line bg-card p-7 shadow-[0_20px_60px_-30px_rgba(111,77,107,0.4)]">
           <h2 className="font-display text-2xl text-ink">Start your journey</h2>
           <p className="mb-6 mt-1 text-sm text-ink-soft">
-            {formatPrice(plan)} for {plan.months} months. You can change any of this later.
+            {formatPrice(plan.amountCents, plan.currency)} for{" "}
+            {describeWindow(plan.window).toLowerCase()}. You can change any of this later.
           </p>
-          <StartForm priceLabel={formatPrice(plan)} />
+          <StartForm priceLabel={formatPrice(plan.amountCents, plan.currency)} />
         </section>
       </div>
+
+      <section className="mb-10 rounded-3xl border border-line bg-card/60 px-7 py-6 sm:flex sm:items-center sm:justify-between sm:gap-6">
+        <div>
+          <div className="font-display text-xl text-plum">Buying for someone else?</div>
+          <p className="mt-1 max-w-xl text-sm leading-relaxed text-ink-soft">
+            Namesake makes a good baby-shower gift — there&apos;s a boxed version you can hand
+            over in person, with your note on the card and a QR that lets the whole room suggest
+            names.
+          </p>
+        </div>
+        <Link
+          href="/gift"
+          className="mt-4 inline-block shrink-0 rounded-full border border-rose-deep px-6 py-3 font-display text-rose-deep transition hover:bg-rose-deep hover:text-white sm:mt-0"
+        >
+          See the gifts
+        </Link>
+      </section>
 
       <footer className="border-t border-line pt-6 text-center text-sm text-ink-soft">
         Made to feel like a keepsake. · Namesake

@@ -1,18 +1,51 @@
-// Namesake — what things cost.
+// Namesake — the product catalog.
 //
-// Prices are defined inline rather than as Stripe Price objects, so there's no
-// dashboard setup to keep in sync with the code. Override the amounts with env
-// vars if you want to change them without a deploy.
+// Two audiences, and the catalog is shaped around that: the gifter buys, the
+// couple uses. Gift tiers are anchored on Bloom, which is the one designed to
+// be handed over at a shower.
+//
+// Everything is a one-time payment. Naming ends, so nothing auto-renews.
+// Prices are inline rather than Stripe Price objects — no dashboard state to
+// drift out of sync with this file — and each is env-overridable.
 
-export type PlanKind = "journey" | "gift" | "extend";
+export type TierId = "sprout" | "bloom" | "whole_journey" | "self_serve";
+export type AddOnId = "rattle" | "blanket" | "framed_print";
 
-export type Plan = {
-  kind: PlanKind;
-  months: number;
+/// How long a purchase grants.
+///
+/// `due_date_grace` can't be resolved when it's bought — a gifter rarely knows
+/// the due date — so it's worked out at redemption, from the date the couple
+/// enters. `fallbackMonths` covers a couple who'd rather not say.
+export type AccessWindow =
+  | { rule: "months"; months: number }
+  | { rule: "due_date_grace"; graceDays: number; fallbackMonths: number };
+
+export type Tier = {
+  id: TierId;
+  /// How it's redeemed: a gift is claimed by whoever holds the code, which for
+  /// the boxed tiers is whoever the box was handed to.
+  kind: "gift" | "journey";
+  name: string;
+  tagline: string;
+  blurb: string;
   amountCents: number;
   currency: string;
+  window: AccessWindow;
+  /// Boxed tiers ship, so checkout has to collect an address.
+  physical: boolean;
+  boxContents?: string[];
+  /// The anchor everything else is read against.
+  featured?: boolean;
+};
+
+export type AddOn = {
+  id: AddOnId;
   name: string;
-  description: string;
+  blurb: string;
+  amountCents: number;
+  physical: boolean;
+  /// Some keepsakes can only be made once there's a name to put on them.
+  shipsAfterNaming?: boolean;
 };
 
 function cents(envVar: string, fallback: number) {
@@ -21,41 +54,132 @@ function cents(envVar: string, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export const PLANS: Record<PlanKind, Plan> = {
-  journey: {
-    kind: "journey",
-    months: 6,
-    amountCents: cents("NAMESAKE_PRICE_JOURNEY_CENTS", 3900),
-    currency: "usd",
-    name: "Namesake · a naming journey",
-    description:
-      "Six months together: the consultant, your shortlist, ideas from family & friends, and a keepsake to keep.",
-  },
-  gift: {
+export const TIERS: Record<TierId, Tier> = {
+  sprout: {
+    id: "sprout",
     kind: "gift",
-    months: 6,
-    amountCents: cents("NAMESAKE_PRICE_GIFT_CENTS", 3900),
+    name: "Sprout",
+    tagline: "A month together",
+    blurb:
+      "The whole experience for a month — enough to find the name, and small enough to go in on with others.",
+    amountCents: cents("NAMESAKE_PRICE_SPROUT_CENTS", 5900),
     currency: "usd",
-    name: "Namesake · a naming journey (gift)",
-    description:
-      "Six months of Namesake for expecting parents you love — they'll set it up in their own words.",
+    window: { rule: "months", months: 1 },
+    physical: false,
   },
-  extend: {
-    kind: "extend",
-    months: 3,
-    amountCents: cents("NAMESAKE_PRICE_EXTEND_CENTS", 1500),
+  bloom: {
+    id: "bloom",
+    kind: "gift",
+    name: "Bloom",
+    tagline: "The one you hand over",
+    blurb:
+      "Three months, arriving in a box you can put in their hands at the shower — with a card in your own words and the QR that brings the whole room in.",
+    amountCents: cents("NAMESAKE_PRICE_BLOOM_CENTS", 10900),
     currency: "usd",
-    name: "Namesake · three more months",
-    description: "More time to keep choosing, with everything exactly as you left it.",
+    window: { rule: "months", months: 3 },
+    physical: true,
+    boxContents: [
+      "A wooden rattle",
+      "A keepsake card carrying your note",
+      "The shower QR, for gathering everyone's suggestions",
+    ],
+    featured: true,
+  },
+  whole_journey: {
+    id: "whole_journey",
+    kind: "gift",
+    name: "The Whole Journey",
+    tagline: "All the way to the due date",
+    blurb:
+      "Everything in Bloom, lasting the rest of the pregnancy — plus a week's grace, because babies keep their own schedules.",
+    amountCents: cents("NAMESAKE_PRICE_WHOLE_JOURNEY_CENTS", 15900),
+    currency: "usd",
+    // Resolved when they redeem and tell us the due date; nine months if they
+    // would rather not say.
+    window: { rule: "due_date_grace", graceDays: 7, fallbackMonths: 9 },
+    physical: true,
+    boxContents: [
+      "A wooden rattle",
+      "A keepsake card carrying your note",
+      "The shower QR, for gathering everyone's suggestions",
+    ],
+  },
+  self_serve: {
+    id: "self_serve",
+    kind: "journey",
+    name: "A journey of your own",
+    tagline: "For the two of you",
+    blurb:
+      "Three months of the consultant, your shortlist, ideas from the people you love, and the keepsake at the end.",
+    amountCents: cents("NAMESAKE_PRICE_SELF_SERVE_CENTS", 4900),
+    currency: "usd",
+    window: { rule: "months", months: 3 },
+    physical: false,
   },
 };
 
-export function formatPrice(plan: Plan) {
-  const amount = plan.amountCents / 100;
-  const whole = Number.isInteger(amount);
+/// Sold at the moment it's needed: you're past your due date and still talking
+/// about it. Repeatable, and it extends from the current end date rather than
+/// from today, so buying early never costs anyone time.
+export const EXTEND = {
+  id: "extend" as const,
+  name: "One week past due?",
+  blurb: "Another month, with everything exactly as you left it.",
+  amountCents: cents("NAMESAKE_PRICE_EXTEND_CENTS", 1900),
+  currency: "usd",
+  window: { rule: "months", months: 1 } satisfies AccessWindow,
+};
+
+export const ADD_ONS: Record<AddOnId, AddOn> = {
+  rattle: {
+    id: "rattle",
+    name: "Monogrammed rattle",
+    blurb: "Upgrades the rattle in the box to one engraved with the initial they choose.",
+    amountCents: cents("NAMESAKE_PRICE_RATTLE_CENTS", 2800),
+    physical: true,
+    shipsAfterNaming: true,
+  },
+  blanket: {
+    id: "blanket",
+    name: "Embroidered blanket",
+    blurb: "Soft cotton, embroidered with the name once it's chosen.",
+    amountCents: cents("NAMESAKE_PRICE_BLANKET_CENTS", 5800),
+    physical: true,
+    shipsAfterNaming: true,
+  },
+  framed_print: {
+    id: "framed_print",
+    name: "Framed keepsake print",
+    blurb: "Their keepsake page — the name and the story behind it — printed and framed.",
+    amountCents: cents("NAMESAKE_PRICE_FRAMED_PRINT_CENTS", 3000),
+    physical: true,
+    shipsAfterNaming: true,
+  },
+};
+
+export const GIFT_TIERS: Tier[] = [TIERS.sprout, TIERS.bloom, TIERS.whole_journey];
+
+export function isTierId(value: string): value is TierId {
+  return value in TIERS;
+}
+
+export function isAddOnId(value: string): value is AddOnId {
+  return value in ADD_ONS;
+}
+
+export function formatPrice(amountCents: number, currency = "usd") {
+  const amount = amountCents / 100;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: plan.currency.toUpperCase(),
-    minimumFractionDigits: whole ? 0 : 2,
+    currency: currency.toUpperCase(),
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
   }).format(amount);
+}
+
+/// Describes a window in words, for the storefront.
+export function describeWindow(window: AccessWindow) {
+  if (window.rule === "months") {
+    return window.months === 1 ? "1 month" : `${window.months} months`;
+  }
+  return "Until the due date, plus a week";
 }

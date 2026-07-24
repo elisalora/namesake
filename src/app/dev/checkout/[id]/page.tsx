@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { paymentsAreSimulated } from "@/lib/purchase";
-import { PLANS, formatPrice, type PlanKind } from "@/lib/pricing";
+import { formatPrice } from "@/lib/pricing";
 import SimulatePaymentButton from "@/components/SimulatePaymentButton";
 
 // Development stand-in for Stripe Checkout. Only reachable while payments are
@@ -11,10 +11,9 @@ export default async function DevCheckoutPage(props: { params: Promise<{ id: str
   if (!paymentsAreSimulated()) notFound();
 
   const { id } = await props.params;
-  const purchase = await db.purchase.findUnique({ where: { id } });
+  const purchase = await db.purchase.findUnique({ where: { id }, include: { items: true } });
   if (!purchase) notFound();
 
-  const plan = PLANS[purchase.kind as PlanKind];
   const alreadyDone = purchase.status !== "pending";
 
   return (
@@ -28,16 +27,37 @@ export default async function DevCheckoutPage(props: { params: Promise<{ id: str
           Dev mode · no Stripe key configured
         </div>
 
-        <h1 className="mt-5 font-display text-3xl text-ink">{plan.name}</h1>
-        <p className="mt-2 text-sm leading-relaxed text-ink-soft">{plan.description}</p>
+        <ul className="mt-5 space-y-2">
+          {purchase.items.map((item) => (
+            <li key={item.id} className="flex items-baseline justify-between gap-3">
+              <span className="text-ink">
+                {item.name}
+                {item.physical && (
+                  <span className="ml-2 text-xs uppercase tracking-wide text-ink-soft">ships</span>
+                )}
+              </span>
+              <span className="text-ink-soft">
+                {formatPrice(item.amountCents, purchase.currency)}
+              </span>
+            </li>
+          ))}
+        </ul>
 
-        <div className="mt-5 flex items-baseline justify-between border-t border-line pt-5">
+        <div className="mt-4 flex items-baseline justify-between border-t border-line pt-4">
           <span className="text-sm text-ink-soft">
-            {plan.months} months
-            {purchase.recipientEmail ? ` · gift for ${purchase.recipientEmail}` : ""}
+            {purchase.recipientEmail ? `Gift for ${purchase.recipientEmail}` : "Total"}
           </span>
-          <span className="font-display text-2xl text-plum">{formatPrice(plan)}</span>
+          <span className="font-display text-2xl text-plum">
+            {formatPrice(purchase.amountCents, purchase.currency)}
+          </span>
         </div>
+
+        {purchase.needsShipping && (
+          <p className="mt-3 rounded-xl bg-paper px-4 py-3 text-xs leading-relaxed text-ink-soft">
+            Stripe would collect a shipping address here. Simulating uses a placeholder one so the
+            orders view has something to render.
+          </p>
+        )}
 
         <div className="mt-6">
           {alreadyDone ? (

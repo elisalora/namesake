@@ -88,12 +88,27 @@ export default async function RedeemPage(props: { params: Promise<{ code: string
         needsDetails={isGift}
         awaitingPayment={awaitingPayment}
         signedInAs={user.email}
-        months={purchase.months}
+        windowLabel={windowLabel(purchase)}
+        // A due-date-relative tier can't know when it ends until they tell us.
+        dueDateMatters={purchase.expiryRule === "due_date_grace"}
         giftFrom={isGift ? purchase.purchaserName : null}
         giftMessage={isGift ? purchase.giftMessage : null}
       />
     </Shell>
   );
+}
+
+/// How long this grant runs, in words. A due-date tier can't say yet.
+function windowLabel(purchase: {
+  expiryRule: string;
+  months: number | null;
+  graceDays: number | null;
+}) {
+  if (purchase.expiryRule === "due_date_grace") {
+    return `until your due date, plus ${purchase.graceDays ?? 7} days`;
+  }
+  const months = purchase.months ?? 1;
+  return months === 1 ? "a month" : `${months} months`;
 }
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {

@@ -132,6 +132,21 @@ export function sendGiftLink(to: string, url: string, fromName: string, message?
   );
 }
 
+/// Sent to whoever bought a boxed tier. When there's no recipient address, they
+/// are holding the only copy of the redeem link until the box arrives — so say
+/// so plainly rather than burying it.
+export function sendBoxOnItsWay(to: string, url: string, recipientWasEmailed: boolean) {
+  const body = recipientWasEmailed
+    ? "Your box is being packed and will be on its way shortly. We've already emailed them their link, so they can start whenever they like — the card in the box has it too."
+    : "Your box is being packed and will be on its way shortly. The card inside carries their link, so it's ready to hand over. Keep this email as your own copy, just in case.";
+  return send(
+    to,
+    "Your Namesake box is on its way",
+    shell("Thank you — it's on its way.", body, url, "See what they'll open"),
+    `Your Namesake box is on its way. Their link: ${url}`,
+  );
+}
+
 function escapeHtml(s: string) {
   return s.replace(
     /[&<>"']/g,

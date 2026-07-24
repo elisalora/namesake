@@ -78,9 +78,32 @@ disappears on its own.
 
 ## Billing
 
-Paid once, not a subscription — **$39 for six months**, with **$15 for three more**
-whenever it's needed. Nothing auto-renews, so there's nothing to cancel and no way to
-quietly bill a family after the naming is over.
+Everything is paid for once. Nothing auto-renews, so there's nothing to cancel and no
+way to quietly bill a family after the naming is over.
+
+Two audiences: **the gifter buys, the couple uses.** The ladder is built around that,
+anchored on Bloom — the boxed tier meant to be handed over at a shower.
+
+| Tier | Who buys | Lasts | Arrives | Price |
+|---|---|---|---|---|
+| **Sprout** | a gifter | 1 month | by email | $59 |
+| **Bloom** ★ | a gifter | 3 months | in a box | $109 |
+| **The Whole Journey** | a gifter | until the due date + 7 days | in a box | $159 |
+| A journey of your own | a parent | 3 months | by email | $49 |
+| *One week past due?* | a member | +1 month | — | $19 |
+
+Add-ons ride along on any gift and are made once there's a name to put on them:
+monogrammed rattle $28, embroidered blanket $58, framed keepsake print $30.
+Every price is env-overridable — see `.env.example`.
+
+**The Whole Journey's window can't be known when it's bought.** A gifter rarely knows the
+due date, so that tier stores a *rule* rather than a date, and it's resolved at redemption
+from what the couple enters — falling back to nine months if they'd rather not say.
+
+**A boxed gift doesn't need the recipient's email.** The redeem code travels on the card
+inside the box, which is the whole mechanic — so `recipientEmail` is optional on the
+physical tiers and the buyer gets the link instead, since until the box arrives they're
+holding the only copy.
 
 **A purchase is the thing that's bought; a journey is what a purchase becomes.** Keeping
 those separate is what makes gifting work without a second concept — a gift is simply a
@@ -89,8 +112,11 @@ grant redeemed by someone other than the person who paid.
 | Kind | Bought by | Redeemed by | Becomes |
 |---|---|---|---|
 | `journey` | a parent, describing their journey first | the same person | that journey |
-| `gift` | anyone, for a couple's email address | the recipient, who describes it themselves | their journey |
-| `extend` | a member of an existing journey | nothing to redeem | three more months |
+| `gift` | anyone, for a couple | whoever holds the code — from an email or off the card | their journey |
+| `extend` | a member of an existing journey | nothing to redeem | more time |
+
+A purchase also carries its **line items** — the tier plus any add-ons. That list is the
+packing slip, which is what `/admin/orders` renders.
 
 Because payment comes first, **a journey can only exist by redeeming a paid grant** —
 there is no code path that mints one for free. Extending measures from the current end
@@ -119,8 +145,36 @@ grants access. Locally:
 stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
 
+### Shipping the boxes
+
+Boxed tiers and add-ons make Stripe collect a shipping address, and each purchase records
+what has to go in the box. `/admin/orders` lists what's outstanding with the packing list
+and the address, and marks things shipped. It's a list, not an integration — deliberately,
+since no supplier is chosen yet, and a real dropship integration would replace exactly
+this. Gate it by setting `NAMESAKE_ADMIN_EMAILS`; empty means nobody.
+
+## The baby-shower QR
+
+Every journey has a suggestion link that anyone can post a name into. `/w/[id]/shower`
+turns it into a QR with a print-ready card and table sign — the thing that goes on the
+gift table, and what the card in the Bloom box points at.
+
+It does three things at once: it spares the couple a day of opinions delivered in person,
+it activates the product at the moment everyone's paying attention, and every guest who
+scans it sees what Namesake is.
+
+## Cost
+
+Inference is the main variable cost per journey, so the two calls are split by what
+they're actually for: the consultant chat is the product and gets a capable model, while
+name enrichment returns a few words of JSON and doesn't. Both are set in `.env`
+(`NAMESAKE_MODEL`, `NAMESAKE_ENRICH_MODEL`).
+
 ## Not yet built (planned)
 
 - Announcement emails to contributors when a name is chosen (Resend)
+- A per-journey token cap, so a runaway conversation can't outrun its tier
+- Add-on upsell at the end of a self-serve journey, once there's a name to put on things
+- Registry integration (Babylist / MyRegistry), which is where the gifter demand is
 - Server-rendered PDF (currently "Save as PDF" via the browser print dialog)
 - Optional mailed print of the keepsake

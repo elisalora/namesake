@@ -347,7 +347,7 @@ function WindowBanner({ ws }: { ws: WorkspaceState }) {
           disabled={busy}
           className="shrink-0 rounded-full bg-rose-deep px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-plum disabled:opacity-60"
         >
-          {busy ? "One moment…" : "Add three months"}
+          {busy ? "One moment…" : "Add another month"}
         </button>
       </div>
     </div>
@@ -410,6 +410,18 @@ function ShareModal({
         {ws.pendingSeat && <InviteByEmail ws={ws} />}
         {ws.pendingSeat && inviteUrl && <CopyRow label="Or hand them this link" url={inviteUrl} />}
         <CopyRow label="Family & friends suggestion link" url={familyUrl} />
+        <Link
+          href={`/w/${ws.id}/shower`}
+          className="flex items-center justify-between rounded-2xl border border-line bg-paper p-4 transition hover:border-rose"
+        >
+          <span>
+            <span className="block text-sm font-semibold text-ink">Having a shower?</span>
+            <span className="mt-0.5 block text-sm text-ink-soft">
+              A printable card and sign, so the whole room can suggest names.
+            </span>
+          </span>
+          <span className="ml-3 shrink-0 text-ink-soft">→</span>
+        </Link>
       </div>
       <button onClick={onClose} className="mt-6 w-full rounded-full border border-line py-2.5 text-plum">
         Done

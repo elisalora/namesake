@@ -50,9 +50,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   }
 
+  // Boxed tiers and add-ons collect an address at Checkout; this is where it
+  // reaches us. `collected_information` is where Stripe puts it now — the
+  // older top-level `shipping_details` is kept as a fallback.
+  const collected = (
+    session as Stripe.Checkout.Session & {
+      collected_information?: { shipping_details?: { name?: string | null; address?: unknown } };
+      shipping_details?: { name?: string | null; address?: unknown };
+    }
+  );
+  const shippingDetails = collected.collected_information?.shipping_details ?? collected.shipping_details;
+
   const result = await fulfillPurchase({
     purchaseId,
     stripeSessionId: session.id,
+    shipping: shippingDetails
+      ? { name: shippingDetails.name ?? null, address: shippingDetails.address }
+      : null,
     origin: originFrom(request),
   });
 

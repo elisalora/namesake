@@ -71,16 +71,26 @@ model LoginToken {
 ///             up front and there is nothing to redeem
 model Purchase {
   id     String @id @default(cuid())
-  kind   String // journey | gift | extend
+  tier   String // sprout | bloom | whole_journey | self_serve | extend
+  kind   String // journey | gift | extend — how it's redeemed
   status String @default("pending") // pending | paid | redeemed
 
-  months      Int
-  amountCents Int
+  /// How long it grants. `months` is fixed at purchase; `due_date_grace` can't
+  /// be — a gifter rarely knows the due date — so it's resolved at redemption
+  /// from the date the couple enters, falling back to `fallbackMonths`.
+  expiryRule     String @default("months") // months | due_date_grace
+  months         Int? // expiryRule = months
+  graceDays      Int? // expiryRule = due_date_grace
+  fallbackMonths Int? // expiryRule = due_date_grace, when no due date is given
+
+  amountCents Int // total charged, tier plus any add-ons
   currency    String @default("usd")
 
   purchaserEmail String
   purchaserName  String?
-  recipientEmail String? // gifts: where the redeem link is sent
+  /// Optional on purpose: a boxed gift carries its redeem code on the card, so
+  /// there may be no address to email it to.
+  recipientEmail String?
   giftMessage    String?
   draft          String? // JSON journey draft, for `journey` purchases
 
@@ -89,14 +99,41 @@ model Purchase {
 
   stripeSessionId String? @unique // also the idempotency key for fulfillment
 
+  /// Physical fulfillment. Set when the tier ships a box or an add-on was
+  /// bought; the address arrives from Stripe with the payment.
+  needsShipping   Boolean   @default(false)
+  shippingName    String?
+  shippingAddress String? // JSON, as Stripe returned it
+  fulfilledAt     DateTime?
+
   createdAt  DateTime  @default(now())
   paidAt     DateTime?
   redeemedAt DateTime?
 
-  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  items     PurchaseItem[]
+  workspace Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([recipientEmail])
+  @@index([needsShipping, fulfilledAt])
+}
+
+/// A line on a purchase — the tier itself, plus any add-ons. This is the
+/// packing list: what actually has to go in the box.
+model PurchaseItem {
+  id          String  @id @default(cuid())
+  purchaseId  String
+  sku         String // tier id or add-on id
+  name        String
+  amountCents Int
+  quantity    Int     @default(1)
+  physical    Boolean @default(false)
+  /// Keepsakes that can't be made until there's a name to put on them.
+  shipsAfterNaming Boolean @default(false)
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
 }
 
 /// The couple's private space — their "nest".
