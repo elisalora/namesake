@@ -1,0 +1,184 @@
+// Namesake — data model
+// A short-term, collaborative baby-name journey for an expecting couple.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// A real person, identified by a verified email address. One user can be a
+/// parent in more than one journey (a second baby, a friend's space).
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique // always stored lowercased
+  name      String?
+  createdAt DateTime @default(now())
+
+  members  Member[]
+  sessions Session[]
+}
+
+/// A signed-in browser. The cookie carries the raw token; we only ever store
+/// its SHA-256 hash, so a leaked database can't be replayed as a login.
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// A single-use magic link. Also hashed at rest.
+///
+/// `purpose` decides what redeeming it does:
+///   signup — create the journey held in `payload`, with this email as owner
+///   login  — sign an existing user back in
+///   invite — bind this email to the Member seat named by `memberId`
+model LoginToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  email     String // lowercased destination address
+  purpose   String    @default("login") // signup | login | invite
+  payload   String? // JSON journey draft, for signup
+  memberId  String? // the seat being claimed, for invite
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email, createdAt])
+}
+
+/// The couple's private space — their "nest".
+model Workspace {
+  id            String    @id @default(cuid())
+  babyLabel     String    @default("Baby") // e.g. "Baby Alora" or "Peanut"
+  lastName      String? // family surname, used for initials + flow checks
+  dueDate       DateTime?
+  status        String    @default("active") // active | decided | archived
+  suggestSlug   String    @unique // public slug for the family suggestion link
+  chosenNameId  String?   @unique
+  decidedReason String? // the story of why they chose — for the keepsake PDF
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  members     Member[]
+  names       NameEntry[]
+  comments    Comment[]
+  suggestions Suggestion[]
+  messages    ChatMessage[]
+  chosenName  NameEntry?    @relation("ChosenName", fields: [chosenNameId], references: [id])
+}
+
+/// A parent's seat in one journey. Two per workspace, typically.
+///
+/// A seat exists before its person does: the owner names their partner at the
+/// start, and that seat sits empty (`userId` null) until the partner verifies
+/// their email. `token` is the unguessable seat-claim link the owner can hand
+/// over when they'd rather not type an address.
+model Member {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String? // set once this person has verified their email
+  name        String
+  email       String? // where the invite was (or will be) sent
+  color       String   @default("#c98ba5") // avatar tint
+  token       String   @unique // per-seat claim link
+  isOwner     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ratings   Rating[]
+  comments  Comment[]
+  messages  ChatMessage[]
+
+  @@unique([workspaceId, userId])
+}
+
+/// A candidate name on the shortlist.
+model NameEntry {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  firstName    String
+  middleName   String?
+  lastName     String? // overrides workspace surname when set
+  gender       String? // girl | boy | neutral
+  origin       String?
+  meaning      String?
+  status       String   @default("considering") // considering | shortlist | vetoed | chosen
+  source       String   @default("parent") // parent | suggestion | ai
+  suggestionId String? // links back to the Suggestion it came from
+  createdAt    DateTime @default(now())
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ratings   Rating[]
+  comments  Comment[]
+  chosenFor Workspace? @relation("ChosenName")
+}
+
+/// One parent's feelings about one name: a heart score, and veto power.
+model Rating {
+  id         String   @id @default(cuid())
+  nameId     String
+  memberId   String
+  score      Int      @default(0) // 0-5 hearts
+  veto       Boolean  @default(false)
+  vetoReason String?
+  updatedAt  DateTime @updatedAt
+
+  name   NameEntry @relation(fields: [nameId], references: [id], onDelete: Cascade)
+  member Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([nameId, memberId])
+}
+
+/// A note on a name — from a parent, or carried in from a family suggestion.
+model Comment {
+  id          String   @id @default(cuid())
+  workspaceId String
+  nameId      String
+  memberId    String? // null when the author is an outside suggester
+  authorName  String // display name (parent's name or "Grandma Rose")
+  body        String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name      NameEntry @relation(fields: [nameId], references: [id], onDelete: Cascade)
+  member    Member?   @relation(fields: [memberId], references: [id], onDelete: SetNull)
+}
+
+/// A name suggestion submitted by family/friends via the public link.
+model Suggestion {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  suggestedName String
+  suggesterName String
+  relationship  String? // "Grandmother", "Best friend", ...
+  reason        String? // the story behind the suggestion
+  email         String? // optional, to notify them of the announcement
+  status        String   @default("pending") // pending | imported | dismissed
+  createdAt     DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+/// The consultant conversation, per workspace (shared by both parents).
+model ChatMessage {
+  id          String   @id @default(cuid())
+  workspaceId String
+  memberId    String? // which parent spoke (null for assistant)
+  role        String // user | assistant
+  content     String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  member    Member?   @relation(fields: [memberId], references: [id], onDelete: SetNull)
+}

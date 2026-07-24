@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+
+# local database
+/dev.db
+/dev.db-journal
+
+# vendored agent skills — restored from skills-lock.json.
+# The editor dirs hold symlinks into .agents, so they go too.
+/.agents
+/.claude/skills
+/.windsurf/skills

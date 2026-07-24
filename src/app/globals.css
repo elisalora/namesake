@@ -1,26 +1,95 @@
 @import "tailwindcss";
 
+/*
+  Namesake — a warm, keepsake palette.
+  Ivory paper, heirloom plum ink, dusty rose, soft gold, and sage.
+  Committed to a single warm light look (this is meant to feel printed).
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #fbf6ef;
+  --paper-2: #f4ece1;
+  --card: #fffdf9;
+  --ink: #33262f;
+  --ink-soft: #6d5f68;
+  --line: #e6dacb;
+  --rose: #c07a9b;
+  --rose-deep: #9c567a;
+  --plum: #6f4d6b;
+  --gold: #c19a4b;
+  --sage: #7f9a82;
+  --blush: #f6e9ee;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-rose: var(--rose);
+  --color-rose-deep: var(--rose-deep);
+  --color-plum: var(--plum);
+  --color-gold: var(--gold);
+  --color-sage: var(--sage);
+  --color-blush: var(--blush);
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--paper);
+  color: var(--ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(192, 122, 155, 0.1), transparent 60%),
+    radial-gradient(900px 500px at -10% 10%, rgba(127, 154, 130, 0.08), transparent 55%),
+    var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+}
+
+/* soft scrollbar for the chat column */
+.scroll-soft::-webkit-scrollbar {
+  width: 8px;
+}
+.scroll-soft::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: rise 0.5s ease both;
+}
+
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-120px) scale(1.1);
+  }
 }
