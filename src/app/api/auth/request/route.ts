@@ -8,6 +8,13 @@ const schema = z.object({
   email: z.string().trim().email("That doesn't look like an email address."),
   // Present when someone is claiming a seat from a shared invite link.
   seatToken: z.string().trim().min(1).optional(),
+  // Where to land afterwards. Kept to in-app paths — the redeem side validates
+  // again, but there's no reason to mint a link carrying anything else.
+  returnTo: z
+    .string()
+    .trim()
+    .regex(/^\/(?!\/)/, "Bad destination.")
+    .optional(),
 });
 
 export async function POST(request: Request) {
@@ -15,7 +22,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
   }
-  const { email, seatToken } = parsed.data;
+  const { email, seatToken, returnTo } = parsed.data;
   const origin = originFrom(request);
 
   if (seatToken) {
@@ -48,7 +55,7 @@ export async function POST(request: Request) {
 
   // Plain sign-in. We send a link whether or not this address has an account —
   // saying "no such user" would leak who's using Namesake.
-  const link = await issueLoginLink({ email, purpose: "login", origin });
+  const link = await issueLoginLink({ email, purpose: "login", origin, returnTo });
   if (!link.ok) return NextResponse.json({ error: link.error }, { status: 429 });
 
   await sendSignInLink(link.email, link.url);

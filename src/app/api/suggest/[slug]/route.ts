@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { hasExpired } from "@/lib/session";
 
 const schema = z.object({
   suggestedName: z.string().trim().min(1).max(60),
@@ -19,6 +20,11 @@ export async function POST(request: Request, ctx: { params: Promise<{ slug: stri
   const ws = await db.workspace.findUnique({ where: { suggestSlug: slug } });
   if (!ws) return NextResponse.json({ error: "not_found" }, { status: 404 });
   if (ws.status !== "active") {
+    return NextResponse.json({ error: "closed" }, { status: 409 });
+  }
+  // Family and friends can't post into a journey whose window has closed
+  // either — the public link is a write path like any other.
+  if (hasExpired(ws)) {
     return NextResponse.json({ error: "closed" }, { status: 409 });
   }
 

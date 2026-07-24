@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { analyzeName } from "@/lib/nameChecks";
+import { hasExpired } from "@/lib/session";
 
 export async function getWorkspaceState(workspaceId: string) {
   const ws = await db.workspace.findUnique({
@@ -62,6 +63,13 @@ export async function getWorkspaceState(workspaceId: string) {
     status: ws.status,
     suggestSlug: ws.suggestSlug,
     dueDate: ws.dueDate ? ws.dueDate.toISOString() : null,
+    expiresAt: ws.expiresAt ? ws.expiresAt.toISOString() : null,
+    expired: hasExpired(ws),
+    // Computed here rather than in the client so rendering stays a pure
+    // function of its props — the poll keeps it fresh.
+    daysLeft: ws.expiresAt
+      ? Math.ceil((ws.expiresAt.getTime() - Date.now()) / 86_400_000)
+      : null,
     decidedReason: ws.decidedReason,
     chosenNameId: ws.chosenNameId,
     createdAt: ws.createdAt.toISOString(),

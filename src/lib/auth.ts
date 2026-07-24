@@ -1,7 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
-import { createJourney, journeyDraft, type JourneyDraft } from "@/lib/journey";
 
 const SESSION_COOKIE = "ns_session";
 const LEGACY_COOKIE = "ns_member"; // pre-auth per-member token; cleared on sign-in
@@ -101,19 +100,20 @@ export async function destroySession() {
 
 /* -------------------------------------------------------------- magic links */
 
-type Purpose = "signup" | "login" | "invite";
+type Purpose = "login" | "invite";
 
 type IssueArgs = {
   email: string;
   purpose: Purpose;
   origin: string;
-  payload?: JourneyDraft;
+  /// Where to land after signing in — e.g. back to a gift being claimed.
+  returnTo?: string;
   memberId?: string;
 };
 
 /// Mint a single-use link. Returns the URL so the caller can mail it — and, in
 /// dev with no mail provider configured, surface it in the UI.
-export async function issueLoginLink({ email, purpose, origin, payload, memberId }: IssueArgs) {
+export async function issueLoginLink({ email, purpose, origin, returnTo, memberId }: IssueArgs) {
   const to = normalizeEmail(email);
 
   const recent = await db.loginToken.count({
@@ -129,7 +129,7 @@ export async function issueLoginLink({ email, purpose, origin, payload, memberId
       tokenHash: hash,
       email: to,
       purpose,
-      payload: payload ? JSON.stringify(payload) : null,
+      payload: returnTo ? JSON.stringify({ returnTo }) : null,
       memberId: memberId ?? null,
       expiresAt: new Date(Date.now() + LINK_MINUTES * 60_000),
     },
@@ -139,7 +139,13 @@ export async function issueLoginLink({ email, purpose, origin, payload, memberId
 }
 
 export type RedeemResult =
-  | { ok: true; workspaceId: string | null; inviteToken?: string; welcome?: boolean }
+  | {
+      ok: true;
+      workspaceId: string | null;
+      inviteToken?: string;
+      welcome?: boolean;
+      returnTo?: string;
+    }
   | { ok: false; reason: "invalid" | "expired" | "used" | "seat-taken" | "malformed" };
 
 /// Consume a magic link: verify it, mark it spent, resolve the person, do
@@ -160,18 +166,6 @@ export async function redeemLoginLink(raw: string): Promise<RedeemResult> {
   const user = await upsertUser(token.email);
 
   switch (token.purpose) {
-    case "signup": {
-      const draft = journeyDraft.safeParse(JSON.parse(token.payload ?? "null"));
-      if (!draft.success) return { ok: false, reason: "malformed" };
-
-      const { workspace, partner } = await createJourney(draft.data, user.id);
-      if (!user.name) {
-        await db.user.update({ where: { id: user.id }, data: { name: draft.data.you.name } });
-      }
-      await createSession(user.id);
-      return { ok: true, workspaceId: workspace.id, inviteToken: partner.token, welcome: true };
-    }
-
     case "invite": {
       const member = token.memberId
         ? await db.member.findUnique({ where: { id: token.memberId } })
@@ -204,12 +198,34 @@ export async function redeemLoginLink(raw: string): Promise<RedeemResult> {
 
     default: {
       await createSession(user.id);
+
+      // A link can carry where the person was headed — claiming a gift, say.
+      // Only in-app paths are honoured, so a crafted link can't turn a sign-in
+      // into an open redirect off the site.
+      const returnTo = safeReturnTo(token.payload);
+      if (returnTo) return { ok: true, workspaceId: null, returnTo };
+
       const seats = await db.member.findMany({
         where: { userId: user.id },
         orderBy: { createdAt: "desc" },
       });
       return { ok: true, workspaceId: seats.length === 1 ? seats[0].workspaceId : null };
     }
+  }
+}
+
+function safeReturnTo(payload: string | null) {
+  if (!payload) return null;
+  try {
+    const parsed = JSON.parse(payload) as { returnTo?: unknown };
+    const value = parsed?.returnTo;
+    if (typeof value !== "string") return null;
+    // Single leading slash only: "//evil.com" and "https://evil.com" are both
+    // absolute destinations once a browser resolves them.
+    if (!value.startsWith("/") || value.startsWith("//")) return null;
+    return value;
+  } catch {
+    return null;
   }
 }
 

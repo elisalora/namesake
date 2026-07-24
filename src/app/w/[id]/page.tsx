@@ -1,7 +1,17 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { getWorkspaceState } from "@/lib/workspace";
 import { getMemberForWorkspace } from "@/lib/session";
 import Dashboard from "@/components/Dashboard";
+
+/// Where this app is being served from, for the share links.
+async function currentOrigin() {
+  const configured = process.env.NAMESAKE_URL?.trim().replace(/\/+$/, "");
+  if (configured) return configured;
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  return `${proto}://${h.get("host") ?? "localhost:3000"}`;
+}
 
 export default async function WorkspacePage(props: {
   params: Promise<{ id: string }>;
@@ -48,6 +58,7 @@ export default async function WorkspacePage(props: {
     <Dashboard
       initial={state}
       me={{ id: member.id, name: member.name, color: member.color }}
+      origin={await currentOrigin()}
       inviteToken={invite ?? null}
       showWelcome={welcome === "1"}
     />

@@ -12,11 +12,16 @@ type Me = { id: string; name: string; color: string };
 export default function Dashboard({
   initial,
   me,
+  origin,
   inviteToken,
   showWelcome,
 }: {
   initial: WorkspaceState;
   me: Me;
+  /// Passed down from the server so the share links are correct on first paint
+  /// — reading window.location during render isn't pure, and doing it in an
+  /// effect meant a flash of empty URLs.
+  origin: string;
   inviteToken: string | null;
   showWelcome: boolean;
 }) {
@@ -24,11 +29,8 @@ export default function Dashboard({
   const [welcome, setWelcome] = useState(showWelcome);
   const [share, setShare] = useState(false);
   const [decideOpen, setDecideOpen] = useState<string | null>(null); // preselected nameId
-  const [origin, setOrigin] = useState("");
   const [mobileTab, setMobileTab] = useState<"chat" | "list">("chat");
   const [reveal, setReveal] = useState(false);
-
-  useEffect(() => setOrigin(window.location.origin), []);
 
   const refresh = useCallback(async () => {
     const res = await fetch(`/api/workspaces/${ws.id}`);
@@ -49,7 +51,7 @@ export default function Dashboard({
   // Prefer the live pending seat over the token that came in on the URL, so the
   // invite is still reachable long after the welcome moment has passed.
   const seatToken = ws.pendingSeat?.token ?? inviteToken;
-  const inviteUrl = seatToken && origin ? `${origin}/join/${seatToken}` : "";
+  const inviteUrl = seatToken ? `${origin}/join/${seatToken}` : "";
   const familyUrl = `${origin}/s/${ws.suggestSlug}`;
 
   return (
@@ -85,7 +87,7 @@ export default function Dashboard({
               Share
             </button>
             <SignOutButton className="hidden sm:inline" />
-            {!decided && (
+            {!decided && !ws.expired && (
               <button
                 onClick={() => setDecideOpen("")}
                 className="rounded-full bg-rose-deep px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-plum"
@@ -96,6 +98,8 @@ export default function Dashboard({
           </div>
         </div>
       </header>
+
+      <WindowBanner ws={ws} />
 
       {decided && chosen && (
         <DecidedBanner ws={ws} chosen={chosen} onReopen={refresh} origin={origin} />
@@ -284,6 +288,66 @@ function CopyRow({ label, url }: { label: string; url: string }) {
           className="rounded-xl bg-plum px-3 py-2 text-sm font-semibold text-white"
         >
           {copied ? "Copied!" : "Copy"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/// The state of the paid window. Silent while there's plenty of time left,
+/// gentle as it approaches, and plain once it's closed — never alarming, and
+/// never suggesting anything they wrote is at risk.
+function WindowBanner({ ws }: { ws: WorkspaceState }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const daysLeft = ws.daysLeft;
+  const closing = !ws.expired && daysLeft !== null && daysLeft <= 21;
+  if (!ws.expired && !closing) return null;
+
+  async function extend() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "extend", workspaceId: ws.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not start checkout.");
+      window.location.href = data.url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className={`border-b ${ws.expired ? "border-line bg-blush/60" : "border-line bg-card/60"}`}>
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3">
+        <div className="text-sm text-ink-soft">
+          {ws.expired ? (
+            <>
+              <span className="font-display text-base text-plum">Your window has closed.</span>{" "}
+              Everything here is still yours to read — add more time whenever you&apos;re ready.
+            </>
+          ) : (
+            <>
+              <span className="font-semibold text-ink">
+                {daysLeft} {daysLeft === 1 ? "day" : "days"} left
+              </span>{" "}
+              in your journey. No rush — you can add more time whenever.
+            </>
+          )}
+          {error && <span className="ml-2 text-rose-deep">{error}</span>}
+        </div>
+        <button
+          onClick={extend}
+          disabled={busy}
+          className="shrink-0 rounded-full bg-rose-deep px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-plum disabled:opacity-60"
+        >
+          {busy ? "One moment…" : "Add three months"}
         </button>
       </div>
     </div>

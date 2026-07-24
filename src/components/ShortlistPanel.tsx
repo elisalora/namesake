@@ -95,7 +95,7 @@ export default function ShortlistPanel({
         </span>
       </div>
 
-      {!decided && (
+      {!decided && !ws.expired && (
         <form onSubmit={addName} className="mb-4 flex gap-2">
           <input
             value={first}

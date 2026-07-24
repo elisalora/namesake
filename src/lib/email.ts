@@ -101,6 +101,37 @@ export function sendInviteLink(to: string, url: string, fromName: string, babyLa
   );
 }
 
+export function sendJourneyReadyLink(to: string, url: string) {
+  return send(
+    to,
+    "Your Namesake journey is ready",
+    shell(
+      "Thank you — let's begin.",
+      "Your payment went through. Tap below to open your journey and invite your partner in.",
+      url,
+      "Open your journey",
+    ),
+    `Open your Namesake journey: ${url}`,
+  );
+}
+
+export function sendGiftLink(to: string, url: string, fromName: string, message?: string | null) {
+  const note = message
+    ? `<div style="margin:20px 0;padding:16px 20px;border-left:3px solid #ecdfd9;font-style:italic;color:#6d5b65;">${escapeHtml(message)}</div>`
+    : "";
+  return send(
+    to,
+    `${fromName} gave you a Namesake journey`,
+    shell(
+      `A gift from ${escapeHtml(fromName)}.`,
+      `Someone thought you might like a gentler way to choose a name. It's yours to set up however you like — six months of it.${note}`,
+      url,
+      "Open your gift",
+    ),
+    `${fromName} gave you a Namesake journey${message ? ` — "${message}"` : ""}: ${url}`,
+  );
+}
+
 function escapeHtml(s: string) {
   return s.replace(
     /[&<>"']/g,

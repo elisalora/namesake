@@ -9,6 +9,7 @@ family & friends, and end with a keepsake page you keep for the baby book.
 - **Next.js 16** (App Router, TypeScript, Tailwind v4)
 - **Prisma 7 + SQLite** (via the `better-sqlite3` driver adapter) — swaps to Postgres for prod
 - **Claude** (Anthropic SDK) powers the consultant chat, streaming, model set in `.env`
+- **Stripe Checkout** for one-time payments — no subscriptions, no customer portal
 
 ## Run it locally
 
@@ -41,8 +42,11 @@ Restart `npm run dev`. That's the only change needed — the chat streams live f
 - `src/app/auth/verify/[token]` — the other end of every magic link
 - `src/app/join/[token]` — partner's seat-claim invitation
 - `src/app/s/[slug]` — public suggestion form for family & friends
-- `src/app/api/*` — route handlers (auth, workspaces, invite, chat stream, names, ratings,
-  comments, suggestions, decide)
+- `src/app/gift` — buy a journey for someone else; `src/app/redeem/[code]` — open one
+- `src/app/api/*` — route handlers (auth, checkout, redeem, Stripe webhook, workspaces,
+  invite, chat stream, names, ratings, comments, suggestions, decide)
+- `src/lib/purchase.ts` — the money path: create, fulfill (idempotent), redeem
+- `src/lib/pricing.ts` — what things cost
 - `src/lib/auth.ts` — sessions, magic-link issue + redeem
 - `src/lib/session.ts` — the one authorization question, asked the same way everywhere
 - `src/lib/email.ts` — Resend, with a console fallback
@@ -72,9 +76,51 @@ offered as an **Open the link →** button in the UI, so the whole flow is walka
 Set the key (and `NAMESAKE_FROM_EMAIL`) and real mail goes out instead — the dev button
 disappears on its own.
 
+## Billing
+
+Paid once, not a subscription — **$39 for six months**, with **$15 for three more**
+whenever it's needed. Nothing auto-renews, so there's nothing to cancel and no way to
+quietly bill a family after the naming is over.
+
+**A purchase is the thing that's bought; a journey is what a purchase becomes.** Keeping
+those separate is what makes gifting work without a second concept — a gift is simply a
+grant redeemed by someone other than the person who paid.
+
+| Kind | Bought by | Redeemed by | Becomes |
+|---|---|---|---|
+| `journey` | a parent, describing their journey first | the same person | that journey |
+| `gift` | anyone, for a couple's email address | the recipient, who describes it themselves | their journey |
+| `extend` | a member of an existing journey | nothing to redeem | three more months |
+
+Because payment comes first, **a journey can only exist by redeeming a paid grant** —
+there is no code path that mints one for free. Extending measures from the current end
+date rather than from today, so buying more time early never throws away time already
+paid for.
+
+### When the window closes
+
+Expired journeys go **read-only, never away**. The shortlist, the conversation and the
+keepsake all stay readable; adding names, rating, commenting, chatting, deciding, and
+family suggestions all refuse with `402`. Extending is deliberately still allowed while
+expired — it's the one thing someone in that state needs to do.
+
+### Payments in development
+
+With no `STRIPE_SECRET_KEY`, checkout routes to a local page with a **Simulate a
+successful payment** button that calls the *same* fulfillment function the real webhook
+calls — so what you exercise locally is the production path, not a parallel one. Setting
+a key removes that page and its endpoint entirely.
+
+With a key set you also need `STRIPE_WEBHOOK_SECRET`; the webhook refuses anything it
+can't verify, and the webhook — not the browser's return from Stripe — is what actually
+grants access. Locally:
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
 ## Not yet built (planned)
 
-- Stripe short-term subscription + "extend"
 - Announcement emails to contributors when a name is chosen (Resend)
 - Server-rendered PDF (currently "Save as PDF" via the browser print dialog)
 - Optional mailed print of the keepsake

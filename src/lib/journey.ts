@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { nanoid, customAlphabet } from "nanoid";
 import { db } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
 
 const slugId = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 10);
 
@@ -26,12 +27,22 @@ export type JourneyDraft = z.infer<typeof journeyDraft>;
 
 /// Create the workspace and both parent seats. The owner's seat is claimed
 /// immediately by `ownerUserId`; the partner's waits for them to verify.
-export async function createJourney(draft: JourneyDraft, ownerUserId: string) {
-  const workspace = await db.workspace.create({
+///
+/// `expiresAt` is the end of the paid window, and `client` lets redemption run
+/// this inside the same transaction that spends the purchase — so a journey and
+/// the grant it came from can never disagree about whether it was claimed.
+export async function createJourney(
+  draft: JourneyDraft,
+  ownerUserId: string,
+  opts: { expiresAt?: Date | null; client?: Prisma.TransactionClient } = {},
+) {
+  const client = opts.client ?? db;
+  const workspace = await client.workspace.create({
     data: {
       babyLabel: draft.babyLabel?.trim() || "Baby",
       lastName: draft.lastName?.trim() || null,
       dueDate: draft.dueDate ? new Date(draft.dueDate) : null,
+      expiresAt: opts.expiresAt ?? null,
       suggestSlug: slugId(),
       members: {
         create: [

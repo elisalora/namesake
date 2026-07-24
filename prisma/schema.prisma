@@ -56,6 +56,49 @@ model LoginToken {
   @@index([email, createdAt])
 }
 
+/// A paid access grant, and the record of the Stripe transaction behind it.
+///
+/// A journey can only come into existence by redeeming one of these, so the
+/// purchase is the thing that's bought — not the workspace. That's what lets
+/// gifting work without a second concept: a gift is simply a grant redeemed by
+/// someone other than the person who paid for it.
+///
+///   journey — bought for yourself; `draft` holds the journey you described
+///             before paying, and redeeming creates it
+///   gift    — bought for someone else; they supply the journey details when
+///             they redeem, so `draft` is null
+///   extend  — pushes an existing workspace's window out; `workspaceId` is set
+///             up front and there is nothing to redeem
+model Purchase {
+  id     String @id @default(cuid())
+  kind   String // journey | gift | extend
+  status String @default("pending") // pending | paid | redeemed
+
+  months      Int
+  amountCents Int
+  currency    String @default("usd")
+
+  purchaserEmail String
+  purchaserName  String?
+  recipientEmail String? // gifts: where the redeem link is sent
+  giftMessage    String?
+  draft          String? // JSON journey draft, for `journey` purchases
+
+  redeemCode  String  @unique // unguessable; the redeem link is the bearer token
+  workspaceId String? // extend: set at purchase. journey/gift: set on redeem.
+
+  stripeSessionId String? @unique // also the idempotency key for fulfillment
+
+  createdAt  DateTime  @default(now())
+  paidAt     DateTime?
+  redeemedAt DateTime?
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([recipientEmail])
+}
+
 /// The couple's private space — their "nest".
 model Workspace {
   id            String    @id @default(cuid())
@@ -63,6 +106,7 @@ model Workspace {
   lastName      String? // family surname, used for initials + flow checks
   dueDate       DateTime?
   status        String    @default("active") // active | decided | archived
+  expiresAt     DateTime? // end of the paid window; null = grandfathered, no expiry
   suggestSlug   String    @unique // public slug for the family suggestion link
   chosenNameId  String?   @unique
   decidedReason String? // the story of why they chose — for the keepsake PDF
@@ -74,6 +118,7 @@ model Workspace {
   comments    Comment[]
   suggestions Suggestion[]
   messages    ChatMessage[]
+  purchases   Purchase[]
   chosenName  NameEntry?    @relation("ChosenName", fields: [chosenNameId], references: [id])
 }
 

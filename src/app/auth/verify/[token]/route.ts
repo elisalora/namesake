@@ -12,6 +12,11 @@ export async function GET(request: Request, ctx: { params: Promise<{ token: stri
     return NextResponse.redirect(new URL(`/signin?error=${result.reason}`, request.url));
   }
 
+  // Signed in on the way to somewhere specific — claiming a gift, say.
+  if (result.returnTo) {
+    return NextResponse.redirect(new URL(result.returnTo, request.url));
+  }
+
   // A brand-new journey: if they gave their partner's address, send that
   // invite now, while they're watching the dashboard appear.
   if (result.welcome && result.inviteToken && result.workspaceId) {

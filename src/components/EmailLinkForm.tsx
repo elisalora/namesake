@@ -7,11 +7,14 @@ import { useState } from "react";
 // a link in your inbox — so they share the same "check your email" moment.
 export default function EmailLinkForm({
   seatToken,
+  returnTo,
   defaultEmail = "",
   cta = "Email me a link",
   placeholder = "you@example.com",
 }: {
   seatToken?: string;
+  /// Where to land after signing in — used to bring someone back to a gift.
+  returnTo?: string;
   defaultEmail?: string;
   cta?: string;
   placeholder?: string;
@@ -33,7 +36,7 @@ export default function EmailLinkForm({
       const res = await fetch("/api/auth/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), seatToken }),
+        body: JSON.stringify({ email: email.trim(), seatToken, returnTo }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong.");

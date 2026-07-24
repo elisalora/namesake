@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getMemberForWorkspace } from "@/lib/session";
+import { getWritableMember, writeDenied } from "@/lib/session";
 
 const schema = z.object({
   nameId: z.string(),
@@ -15,8 +15,9 @@ export async function POST(request: Request) {
 
   const name = await db.nameEntry.findUnique({ where: { id: nameId } });
   if (!name) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  const member = await getMemberForWorkspace(name.workspaceId);
-  if (!member) return NextResponse.json({ error: "not_a_member" }, { status: 403 });
+  const access = await getWritableMember(name.workspaceId);
+  if (!access.ok) return writeDenied(access);
+  const member = access.member;
 
   const comment = await db.comment.create({
     data: {

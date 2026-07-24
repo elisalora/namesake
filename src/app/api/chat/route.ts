@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getMemberForWorkspace } from "@/lib/session";
+import { getWritableMember } from "@/lib/session";
 import { streamConsultant, extractSuggestions, type ConsultantContext, type ChatTurn } from "@/lib/consultant";
 
 const schema = z.object({
@@ -13,8 +13,15 @@ export async function POST(request: Request) {
   if (!parsed.success) return new Response("invalid", { status: 400 });
   const { workspaceId, message } = parsed.data;
 
-  const member = await getMemberForWorkspace(workspaceId);
-  if (!member) return new Response("not_a_member", { status: 403 });
+  // This one streams, so it answers in plain text rather than the shared JSON
+  // refusal — but the check behind it is the same.
+  const access = await getWritableMember(workspaceId);
+  if (!access.ok) {
+    return new Response(access.status === 402 ? "journey_expired" : "not_a_member", {
+      status: access.status,
+    });
+  }
+  const member = access.member;
 
   // Assemble the couple's current context for the consultant.
   const ws = await db.workspace.findUnique({

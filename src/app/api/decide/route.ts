@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getMemberForWorkspace } from "@/lib/session";
+import { getWritableMember, writeDenied } from "@/lib/session";
 
 const schema = z.object({
   workspaceId: z.string(),
@@ -14,8 +14,8 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
   const { workspaceId, nameId, reason } = parsed.data;
 
-  const member = await getMemberForWorkspace(workspaceId);
-  if (!member) return NextResponse.json({ error: "not_a_member" }, { status: 403 });
+  const access = await getWritableMember(workspaceId);
+  if (!access.ok) return writeDenied(access);
 
   const name = await db.nameEntry.findFirst({ where: { id: nameId, workspaceId } });
   if (!name) return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -37,8 +37,8 @@ export async function DELETE(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
   const { workspaceId } = parsed.data;
 
-  const member = await getMemberForWorkspace(workspaceId);
-  if (!member) return NextResponse.json({ error: "not_a_member" }, { status: 403 });
+  const access = await getWritableMember(workspaceId);
+  if (!access.ok) return writeDenied(access);
 
   const ws = await db.workspace.findUnique({ where: { id: workspaceId } });
   if (ws?.chosenNameId) {

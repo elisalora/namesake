@@ -1,13 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { CheckYourEmail } from "@/components/EmailLinkForm";
 
-export default function StartForm() {
+export default function StartForm({ priceLabel }: { priceLabel: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sentTo, setSentTo] = useState<string | null>(null);
-  const [devUrl, setDevUrl] = useState<string | null>(null);
   const [form, setForm] = useState({
     you: "",
     youEmail: "",
@@ -34,27 +31,28 @@ export default function StartForm() {
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/workspaces", {
+      const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          you: { name: form.you.trim(), email: form.youEmail.trim() },
-          partner: { name: form.partner.trim(), email: form.partnerEmail.trim() },
-          babyLabel: form.babyLabel.trim(),
-          lastName: form.lastName.trim(),
+          kind: "journey",
+          draft: {
+            you: { name: form.you.trim(), email: form.youEmail.trim() },
+            partner: { name: form.partner.trim(), email: form.partnerEmail.trim() },
+            babyLabel: form.babyLabel.trim(),
+            lastName: form.lastName.trim(),
+          },
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
-      setDevUrl(data.devUrl ?? null);
-      setSentTo(data.email);
+      // Off to Checkout. The journey itself is created when the payment clears.
+      window.location.href = data.url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setLoading(false);
     }
   }
-
-  if (sentTo) return <CheckYourEmail email={sentTo} devUrl={devUrl} />;
 
   return (
     <form onSubmit={submit} className="space-y-4">
@@ -104,11 +102,11 @@ export default function StartForm() {
         disabled={loading}
         className="w-full rounded-full bg-rose-deep py-3.5 font-display text-lg text-white transition hover:bg-plum disabled:opacity-60"
       >
-        {loading ? "Preparing your space…" : "Begin the journey"}
+        {loading ? "Taking you to checkout…" : `Begin the journey · ${priceLabel}`}
       </button>
-      <p className="text-center text-xs text-ink-soft">
-        No passwords. We&apos;ll email you a link to open your journey — and invite your partner in,
-        if you added their address.
+      <p className="text-center text-xs leading-relaxed text-ink-soft">
+        Six months, paid once — no subscription, nothing to cancel. You can add more time later if
+        you need it.
       </p>
     </form>
   );

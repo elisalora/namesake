@@ -174,12 +174,17 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
                 }
               }}
               rows={1}
-              placeholder="Say anything — this is just between us…"
-              className="max-h-32 flex-1 resize-none rounded-2xl border border-line bg-paper px-4 py-3 outline-none focus:border-rose"
+              disabled={ws.expired}
+              placeholder={
+                ws.expired
+                  ? "Your window has closed — everything here is still yours to read."
+                  : "Say anything — this is just between us…"
+              }
+              className="max-h-32 flex-1 resize-none rounded-2xl border border-line bg-paper px-4 py-3 outline-none focus:border-rose disabled:opacity-60"
             />
             <button
               onClick={() => send(input)}
-              disabled={streaming || !input.trim()}
+              disabled={ws.expired || streaming || !input.trim()}
               className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-rose-deep text-white transition hover:bg-plum disabled:opacity-50"
               aria-label="Send"
             >
