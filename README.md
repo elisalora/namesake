@@ -176,5 +176,35 @@ name enrichment returns a few words of JSON and doesn't. Both are set in `.env`
 - A per-journey token cap, so a runaway conversation can't outrun its tier
 - Add-on upsell at the end of a self-serve journey, once there's a name to put on things
 - Registry integration (Babylist / MyRegistry), which is where the gifter demand is
+
+### Naming a pet — parked, with a note on what it would take
+
+A small, silly version for naming a pet is appealing for two real reasons: it's a
+low-stakes way to meet people before they're expecting, and it gives a past customer
+something to come back for.
+
+**It isn't a tier, though — it's a second product mode.** The parts that make Namesake
+good are specifically about naming a human child:
+
+- the consultant's persona is built around two people who may disagree, family
+  expectation, sibling names, and how a name sits with a surname
+- `nameChecks.ts` looks for unfortunate monograms, teasing potential, and surname flow —
+  a dog has no school locker
+- the journey itself assumes a due date, two parent seats, and a keepsake for the baby book
+
+So a pet mode needs its own persona, its own checks, a different draft, and a different
+keepsake. That's a branch through the core, not a row in the catalog.
+
+**The strategic cost is the bigger one.** The positioning is the baby-shower gift, and
+the first channel is baby registries. Pet naming shares neither: there's no pet shower to
+put a QR card on, and no registry to sit inside — so the growth engine doesn't come with
+it. The conversion story is also weaker than it sounds; someone who names a puppy may be
+years from a baby, with nothing bringing them back in between.
+
+**What would make it worth building:** evidence that the *gifting* occasion exists — that
+people buy presents to mark a new pet the way they do a new baby. If that's real, the
+right move is probably a sibling product sharing this codebase's engine, with its own
+wedge and its own channel, rather than a tier bolted into this ladder. Worth ten minutes
+looking at what Etsy's "new puppy gift" listings actually sell before spending more.
 - Server-rendered PDF (currently "Save as PDF" via the browser print dialog)
 - Optional mailed print of the keepsake
