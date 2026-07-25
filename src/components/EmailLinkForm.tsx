@@ -91,6 +91,15 @@ export function CheckYourEmail({ email, devUrl }: { email: string; devUrl: strin
         We sent a link to <span className="font-semibold text-ink">{email}</span>. Tap it and
         you&apos;re in — it works once, and expires in 30 minutes.
       </p>
+      {/* We're a new sender still earning a reputation, so a fair share of this
+          lands in spam. Saying so is better than letting someone conclude the
+          product is broken — and "mark as not spam" is the single most useful
+          thing they can do for the next person. */}
+      <p className="mt-3 text-xs leading-relaxed text-ink-soft">
+        Not there within a minute? Have a look in spam or promotions — we&apos;re a new sender
+        and still earning our place in inboxes. Marking it &ldquo;not spam&rdquo; helps more than
+        you&apos;d think.
+      </p>
 
       {devUrl && (
         <div className="mt-6 rounded-2xl border border-dashed border-line bg-paper p-4 text-left">
