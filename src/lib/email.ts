@@ -14,6 +14,13 @@ function fromAddress() {
   return process.env.NAMESAKE_FROM_EMAIL || "Namesake <onboarding@resend.dev>";
 }
 
+/// Where a reply goes. A transactional address nobody reads is both unkind and
+/// a small negative signal to spam filters — mail from a domain that never
+/// accepts a reply looks more like bulk than correspondence.
+function replyTo() {
+  return process.env.NAMESAKE_REPLY_TO || process.env.NAMESAKE_SUPPORT_EMAIL || null;
+}
+
 type Sent = { delivered: boolean; error?: string };
 
 async function send(to: string, subject: string, html: string, text: string): Promise<Sent> {
@@ -29,7 +36,14 @@ async function send(to: string, subject: string, html: string, text: string): Pr
         Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from: fromAddress(), to: [to], subject, html, text }),
+      body: JSON.stringify({
+        from: fromAddress(),
+        to: [to],
+        subject,
+        html,
+        text,
+        ...(replyTo() ? { reply_to: replyTo() } : {}),
+      }),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
@@ -43,16 +57,18 @@ async function send(to: string, subject: string, html: string, text: string): Pr
   }
 }
 
-// A soft, keepsake-ish wrapper so the emails feel like the rest of the app.
+// The email in the same clothes as the site: oyster paper, pewter ink, a sage
+// button. Georgia stands in for Cormorant — mail clients can't load webfonts,
+// and a serif that exists everywhere beats one that silently becomes Arial.
 function shell(heading: string, body: string, url: string, cta: string) {
   return `
-  <div style="margin:0;padding:32px 16px;background:#fbf7f4;font-family:ui-sans-serif,-apple-system,'Segoe UI',sans-serif;">
-    <div style="max-width:520px;margin:0 auto;background:#fffdfc;border:1px solid #ecdfd9;border-radius:24px;padding:36px;">
-      <div style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#b0798f;font-weight:600;">Namesake</div>
-      <h1 style="margin:14px 0 0;font-size:26px;line-height:1.25;color:#4a3340;font-weight:600;">${heading}</h1>
-      <p style="margin:16px 0 28px;font-size:16px;line-height:1.6;color:#6d5b65;">${body}</p>
-      <a href="${url}" style="display:inline-block;background:#b0798f;color:#fff;text-decoration:none;padding:14px 28px;border-radius:999px;font-size:16px;font-weight:600;">${cta}</a>
-      <p style="margin:28px 0 0;font-size:13px;line-height:1.6;color:#9b8791;">
+  <div style="margin:0;padding:32px 16px;background:#f5f2e9;font-family:ui-sans-serif,-apple-system,'Segoe UI',Helvetica,sans-serif;">
+    <div style="max-width:520px;margin:0 auto;background:#fdfcf7;border:1px solid #ded8c9;border-radius:22px;padding:38px;">
+      <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#9aa1a2;font-weight:600;">Namesake</div>
+      <h1 style="margin:16px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.15;color:#262b26;font-weight:500;">${heading}</h1>
+      <p style="margin:16px 0 30px;font-size:16px;line-height:1.65;color:#5f655d;">${body}</p>
+      <a href="${url}" style="display:inline-block;background:#55654f;color:#ffffff;text-decoration:none;padding:14px 30px;border-radius:999px;font-size:16px;font-weight:600;">${cta}</a>
+      <p style="margin:30px 0 0;font-size:13px;line-height:1.6;color:#8b918a;">
         This link works once and expires in 30 minutes. If you didn't ask for it, you can ignore this email.
       </p>
     </div>
@@ -117,7 +133,7 @@ export function sendJourneyReadyLink(to: string, url: string) {
 
 export function sendGiftLink(to: string, url: string, fromName: string, message?: string | null) {
   const note = message
-    ? `<div style="margin:20px 0;padding:16px 20px;border-left:3px solid #ecdfd9;font-style:italic;color:#6d5b65;">${escapeHtml(message)}</div>`
+    ? `<div style="margin:20px 0;padding:16px 20px;border-left:2px solid #ded8c9;font-style:italic;color:#5f655d;">${escapeHtml(message)}</div>`
     : "";
   return send(
     to,
