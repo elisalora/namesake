@@ -2,16 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { WorkspaceState } from "@/lib/workspace";
+import { openingMessage, CONVERSATION_STARTERS } from "@/lib/opening";
+import { namedParents } from "@/lib/seat";
 
 type Me = { id: string; name: string; color: string };
 type Msg = { role: string; content: string; authorName?: string | null; authorColor?: string | null };
-
-const STARTERS = [
-  "We're honestly stuck — where do we start?",
-  "We'd love a name that honors family.",
-  "We like classic names that aren't too common.",
-  "Something short and nature-inspired?",
-];
 
 function displayText(t: string) {
   const i = t.indexOf("[[");
@@ -33,6 +28,10 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
   const [added, setAdded] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const decided = ws.status === "decided";
+  const opening = openingMessage({
+    babyLabel: ws.babyLabel,
+    parents: namedParents(ws.members),
+  });
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -109,15 +108,12 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
       <div ref={scrollRef} className="scroll-soft flex-1 space-y-4 overflow-y-auto px-5 py-5">
         {messages.length === 0 && (
           <div className="animate-rise space-y-3">
-            <Bubble role="assistant">
-              Congratulations — what a lovely thing to be doing together. There&apos;s no rush and no
-              wrong answers here. Tell me a little about the name you&apos;re dreaming of for{" "}
-              <span className="font-semibold">{ws.babyLabel}</span> — a feeling, a family story, a
-              sound you love — and we&apos;ll find our way from there.
-            </Bubble>
+            {/* Same text the server hands the model as its opening turn, so
+                what's on screen and what the model believes it said agree. */}
+            <Bubble role="assistant">{opening}</Bubble>
             {!decided && (
               <div className="flex flex-wrap gap-2 pl-1">
-                {STARTERS.map((s) => (
+                {CONVERSATION_STARTERS.map((s) => (
                   <button
                     key={s}
                     onClick={() => send(s)}

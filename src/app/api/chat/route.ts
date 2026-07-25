@@ -2,6 +2,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getWritableMember } from "@/lib/session";
 import { streamConsultant, extractSuggestions, type ConsultantContext, type ChatTurn } from "@/lib/consultant";
+import { openingMessage } from "@/lib/opening";
+import { namedParents } from "@/lib/seat";
 
 const schema = z.object({
   workspaceId: z.string(),
@@ -67,6 +69,18 @@ export async function POST(request: Request) {
     role: m.role === "assistant" ? "assistant" : "user",
     content: m.content,
   }));
+
+  // The panel paints an opening before anyone types, and it was never stored
+  // or sent — so the model had no idea it had asked anything, and a reply to
+  // that question ("we like classic names that aren't too common") arrived as
+  // a non-sequitur. Give it its own first turn.
+  if (history.length === 0) {
+    history.push({
+      role: "assistant",
+      content: openingMessage({ babyLabel: ws.babyLabel, parents: namedParents(ws.members) }),
+    });
+  }
+
   history.push({ role: "user", content: message });
 
   // Persist the parent's message with attribution.
@@ -85,10 +99,21 @@ export async function POST(request: Request) {
           controller.enqueue(encoder.encode(chunk));
         }
       } catch (err) {
-        const msg = "\n\n(Sorry — I lost my thread for a moment. Could you say that again?)";
+        // Distinguish "never got going" from "died mid-sentence": the first is
+        // almost always configuration — a model the key can't reach — and the
+        // apology should read differently from a genuine interruption.
+        const started = full.length > 0;
+        const msg = started
+          ? "\n\n(Sorry — I lost my thread there. Could you say that again?)"
+          : "I couldn't reach my thoughts just then. Try me once more in a moment.";
         controller.enqueue(encoder.encode(msg));
         full += msg;
-        console.error("consultant stream error", err);
+
+        const e = err as { status?: number; message?: string };
+        console.error(
+          `[namesake] consultant failed (model=${process.env.NAMESAKE_MODEL ?? "default"}, ` +
+            `status=${e?.status ?? "none"}, started=${started}): ${e?.message ?? String(err)}`,
+        );
       } finally {
         const { clean } = extractSuggestions(full);
         await db.chatMessage.create({

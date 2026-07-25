@@ -15,10 +15,10 @@ async function currentOrigin() {
 
 export default async function WorkspacePage(props: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ invite?: string; welcome?: string }>;
+  searchParams: Promise<{ welcome?: string }>;
 }) {
   const { id } = await props.params;
-  const { invite, welcome } = await props.searchParams;
+  const { welcome } = await props.searchParams;
 
   const member = await getMemberForWorkspace(id);
   if (!member) {
@@ -59,7 +59,6 @@ export default async function WorkspacePage(props: {
       initial={state}
       me={{ id: member.id, name: member.name, color: member.color }}
       origin={await currentOrigin()}
-      inviteToken={invite ?? null}
       showWelcome={welcome === "1"}
     />
   );

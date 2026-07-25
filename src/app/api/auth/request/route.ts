@@ -34,6 +34,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "That invite link isn't valid." }, { status: 404 });
     }
     if (seat.userId) {
+      console.warn(`[namesake] invite refused: seat ${seat.id} already claimed`);
       return NextResponse.json(
         { error: "This seat has already been claimed. Sign in with the email you used." },
         { status: 409 },
@@ -46,7 +47,10 @@ export async function POST(request: Request) {
       memberId: seat.id,
       origin,
     });
-    if (!link.ok) return NextResponse.json({ error: link.error }, { status: 429 });
+    if (!link.ok) {
+      console.warn(`[namesake] invite refused: rate limit for ${email}`);
+      return NextResponse.json({ error: link.error }, { status: 429 });
+    }
 
     const inviter = seat.workspace.members.find((m) => m.isOwner);
     const sent = await sendInviteLink(
@@ -56,6 +60,10 @@ export async function POST(request: Request) {
       seat.workspace.babyLabel,
     );
     if (!deliverable(sent)) return undeliverable();
+    // Sign-in has no fallback, so every issued link is worth a log line: when
+    // someone says "it never arrived", this is what tells you whether we sent
+    // it, refused to, or never got that far.
+    console.log(`[namesake] invite link sent to ${link.email} for seat ${seat.id}`);
     return NextResponse.json({ sent: true, email: link.email, devUrl: devUrl(link.url) });
   }
 
@@ -66,6 +74,7 @@ export async function POST(request: Request) {
 
   const sent = await sendSignInLink(link.email, link.url);
   if (!deliverable(sent)) return undeliverable();
+  console.log(`[namesake] sign-in link sent to ${link.email}`);
   return NextResponse.json({ sent: true, email: link.email, devUrl: devUrl(link.url) });
 }
 

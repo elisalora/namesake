@@ -14,7 +14,6 @@ export default function Dashboard({
   initial,
   me,
   origin,
-  inviteToken,
   showWelcome,
 }: {
   initial: WorkspaceState;
@@ -23,7 +22,6 @@ export default function Dashboard({
   /// — reading window.location during render isn't pure, and doing it in an
   /// effect meant a flash of empty URLs.
   origin: string;
-  inviteToken: string | null;
   showWelcome: boolean;
 }) {
   const [ws, setWs] = useState(initial);
@@ -48,10 +46,16 @@ export default function Dashboard({
   }, [refresh]);
 
   const decided = ws.status === "decided";
+  // "Decide together" is a promise about two people. Somebody doing this alone
+  // shouldn't be told to agree with an empty chair.
+  const together = ws.members.filter((m) => m.joined).length > 1;
   const chosen = ws.names.find((n) => n.id === ws.chosenNameId);
-  // Prefer the live pending seat over the token that came in on the URL, so the
-  // invite is still reachable long after the welcome moment has passed.
-  const seatToken = ws.pendingSeat?.token ?? inviteToken;
+  // The one unclaimed seat is the only source of an invite link. It used to
+  // fall back to the token in the URL, which meant that reloading an old
+  // ?invite= link kept showing a way in after the seat was taken. A journey
+  // holds two people; once the second has arrived there is nobody left to
+  // invite, and the link should stop existing.
+  const seatToken = ws.pendingSeat?.token ?? null;
   const inviteUrl = seatToken ? `${origin}/join/${seatToken}` : "";
   const familyUrl = `${origin}/s/${ws.suggestSlug}`;
 
@@ -95,7 +99,7 @@ export default function Dashboard({
                 onClick={() => setDecideOpen("")}
                 className="rounded-full bg-sage-deep px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-pewter"
               >
-                Decide together
+                {together ? "Decide together" : "Decide"}
               </button>
             )}
           </div>
