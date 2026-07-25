@@ -172,6 +172,16 @@ export async function startCheckout(purchaseId: string, origin: string) {
 
   const stripe = getStripe();
   if (!stripe) {
+    // The simulate-payment page only exists in development. Deployed without a
+    // Stripe key there is nowhere to send a buyer, so say so plainly rather
+    // than handing them a link that 404s.
+    if (!paymentsAreSimulated()) {
+      console.error("[namesake] checkout attempted with no STRIPE_SECRET_KEY configured");
+      return {
+        ok: false as const,
+        error: "Payments aren't set up yet. Nothing has been charged.",
+      };
+    }
     return { ok: true as const, url: `${origin}/dev/checkout/${purchase.id}`, simulated: true };
   }
 
