@@ -23,7 +23,16 @@ postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require
 > **Why not SQLite:** Vercel's filesystem is ephemeral. A SQLite file would be thrown away
 > on every deploy and every cold start, taking every journey, user and purchase with it.
 
-You don't need to run migrations by hand — the build command does it (see step 5).
+**Neon gives you two connection strings and the difference matters.** The *pooled* one
+(host contains `-pooler`) is what the app should use — serverless opens a lot of short
+connections and the pooler is what keeps that from exhausting Postgres. The *direct* one
+is what migrations should use, because the pooler runs in transaction mode and doesn't
+reliably support the session-level advisory locks Prisma Migrate needs.
+
+The build handles this: it applies migrations over `MIGRATE_DATABASE_URL` when set, and
+falls back to `DATABASE_URL` otherwise. So set both (see step 5).
+
+You don't need to run migrations by hand — the build command does it.
 
 ---
 
@@ -82,7 +91,8 @@ Set these in Vercel under **Settings → Environment Variables**. Mark them for 
 
 | Variable | Value | Required? |
 |---|---|---|
-| `DATABASE_URL` | connection string from step 1 | **yes** |
+| `DATABASE_URL` | **pooled** connection string from step 1 | **yes** |
+| `MIGRATE_DATABASE_URL` | **direct** (unpooled) connection string | with Neon |
 | `NAMESAKE_URL` | `https://namesake.alora.tech` | **yes** |
 | `RESEND_API_KEY` | from step 2 | yes, to let anyone sign in |
 | `NAMESAKE_FROM_EMAIL` | `Namesake <hello@alora.tech>` | with Resend |
