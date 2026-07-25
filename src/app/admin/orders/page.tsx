@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
@@ -67,13 +68,23 @@ export default async function OrdersPage(props: {
                       {formatPrice(order.amountCents, order.currency)}
                     </span>
                   </div>
-                  {order.fulfilledAt ? (
-                    <span className="text-sm text-ink-soft">
-                      Shipped {order.fulfilledAt.toISOString().slice(0, 10)}
-                    </span>
-                  ) : (
-                    <MarkFulfilled purchaseId={order.id} />
-                  )}
+                  <span className="flex items-center gap-3">
+                    {order.kind !== "extend" && (
+                      <Link
+                        href={`/admin/orders/${order.id}/card`}
+                        className="text-sm font-semibold text-sage-deep hover:text-pewter"
+                      >
+                        Print the card →
+                      </Link>
+                    )}
+                    {order.fulfilledAt ? (
+                      <span className="text-sm text-ink-soft">
+                        Shipped {order.fulfilledAt.toISOString().slice(0, 10)}
+                      </span>
+                    ) : (
+                      <MarkFulfilled purchaseId={order.id} />
+                    )}
+                  </span>
                 </div>
 
                 {waitingOnName && (

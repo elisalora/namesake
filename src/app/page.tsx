@@ -85,8 +85,8 @@ export default function Home() {
             The one people put on the registry
           </div>
           <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-ink-soft">
-            There is a boxed edition — a card in your own hand, and a second one the whole
-            shower can scan. Given at the table, opened in front of everyone.
+            There is a boxed edition — your note on the card, and the link that opens it.
+            Handed over at the table, opened in front of everyone.
           </p>
         </div>
         <Link
