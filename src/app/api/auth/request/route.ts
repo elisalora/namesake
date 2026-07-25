@@ -49,7 +49,13 @@ export async function POST(request: Request) {
     if (!link.ok) return NextResponse.json({ error: link.error }, { status: 429 });
 
     const inviter = seat.workspace.members.find((m) => m.isOwner);
-    await sendInviteLink(link.email, link.url, inviter?.name ?? "Your partner", seat.workspace.babyLabel);
+    const sent = await sendInviteLink(
+      link.email,
+      link.url,
+      inviter?.name ?? "Your partner",
+      seat.workspace.babyLabel,
+    );
+    if (!deliverable(sent)) return undeliverable();
     return NextResponse.json({ sent: true, email: link.email, devUrl: devUrl(link.url) });
   }
 
@@ -58,8 +64,25 @@ export async function POST(request: Request) {
   const link = await issueLoginLink({ email, purpose: "login", origin, returnTo });
   if (!link.ok) return NextResponse.json({ error: link.error }, { status: 429 });
 
-  await sendSignInLink(link.email, link.url);
+  const sent = await sendSignInLink(link.email, link.url);
+  if (!deliverable(sent)) return undeliverable();
   return NextResponse.json({ sent: true, email: link.email, devUrl: devUrl(link.url) });
+}
+
+/// With no mail provider configured we log the link instead, which is a
+/// deliberate development path rather than a failure. With one configured, a
+/// failed send is a real failure and must not be reported as success — there
+/// is no password to fall back on, so a swallowed error means a person simply
+/// cannot get in, and nobody finds out.
+function deliverable(result: { delivered: boolean }) {
+  return result.delivered || !emailIsLive();
+}
+
+function undeliverable() {
+  return NextResponse.json(
+    { error: "We couldn't send that email just now. Try again in a moment." },
+    { status: 502 },
+  );
 }
 
 // Only ever populated in local development with no mail provider configured,
