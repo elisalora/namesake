@@ -113,7 +113,13 @@ export default function GiftPage() {
 
       <footer className="mt-16 border-t border-line pt-7 text-center">
         <DuckMark className="mx-auto h-4 w-auto text-pewter-light" />
-        <p className="mt-2.5 text-sm text-ink-soft">Namesake</p>
+        <p className="mt-2.5 text-sm text-ink-soft">
+          <Link href="/faq" className="hover:text-sage-deep">Questions</Link>
+          <span className="mx-2 text-line">·</span>
+          <Link href="/refunds" className="hover:text-sage-deep">Refunds</Link>
+          <span className="mx-2 text-line">·</span>
+          Namesake
+        </p>
       </footer>
     </main>
   );

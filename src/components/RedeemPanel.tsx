@@ -59,8 +59,8 @@ export default function RedeemPanel({
   const claim = useCallback(async () => {
     setError(null);
     if (needsDetails) {
-      if (!form.you.trim() || !form.partner.trim()) {
-        setError("Add both of your first names to begin.");
+      if (!form.you.trim()) {
+        setError("Add your first name to begin.");
         return;
       }
     }
@@ -128,6 +128,7 @@ export default function RedeemPanel({
             <Field label="Your first name" value={form.you} onChange={(v) => set("you", v)} placeholder="Alex" />
             <Field
               label="Partner's first name"
+              hint="optional"
               value={form.partner}
               onChange={(v) => set("partner", v)}
               placeholder="Sam"

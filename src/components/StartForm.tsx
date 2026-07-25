@@ -21,8 +21,8 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!form.you.trim() || !form.partner.trim()) {
-      setError("Add both of your first names to begin.");
+    if (!form.you.trim()) {
+      setError("Add your first name to begin.");
       return;
     }
     if (!form.youEmail.trim()) {
@@ -59,7 +59,13 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <Field label="Your first name" value={form.you} onChange={(v) => set("you", v)} placeholder="Alex" />
-        <Field label="Partner's first name" value={form.partner} onChange={(v) => set("partner", v)} placeholder="Sam" />
+        <Field
+          label="Partner's first name"
+          hint="optional"
+          value={form.partner}
+          onChange={(v) => set("partner", v)}
+          placeholder="Sam"
+        />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field
@@ -107,7 +113,11 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
       </button>
       <p className="text-center text-xs leading-relaxed text-ink-soft">
         Paid once — no subscription, nothing to cancel. You can add more time later if you need
-        it.
+        it, and it&apos;s{" "}
+        <a href="/refunds" className="underline underline-offset-2 hover:text-sage-deep">
+          refundable
+        </a>{" "}
+        until you open it.
       </p>
     </form>
   );

@@ -43,10 +43,20 @@ server log, which on a deployed box means **only you can read them, so only you 
 in**. This is the step people skip and then wonder why their demo doesn't work.
 
 1. Sign up at [Resend](https://resend.com) and create an API key.
-2. Verify a sending domain. `alora.tech` is fine — you do **not** need to verify the
-   subdomain separately. Resend will give you DNS records (DKIM etc.) to add at your
-   registrar alongside the CNAME from step 4.
-3. Note the address you'll send from, e.g. `Namesake <hello@alora.tech>`.
+2. **Verify the same subdomain the site runs on** — `namesake.alora.tech`. Resend puts its
+   records on `send.namesake.alora.tech` and `resend._domainkey.namesake.alora.tech`,
+   which sit *below* the CNAME pointing at Vercel rather than at it, so they coexist
+   happily with the site.
+3. Add the records Resend gives you at whoever hosts DNS for the root domain, then hit
+   **Verify**.
+4. Note the address you'll send from. **It has to be on the verified domain** —
+   `Namesake <hello@namesake.alora.tech>`. A from-address on a different domain is the
+   most common reason sending fails after everything else looks green.
+
+> ⚠️ **Do not add a second SPF record to the root domain.** If the root already has one —
+> Google Workspace publishes `v=spf1 include:_spf.google.com ~all` — adding another makes
+> **both invalid** and breaks all mail on that domain. Verifying a subdomain, as above,
+> avoids the question entirely.
 
 ---
 
@@ -95,7 +105,8 @@ Set these in Vercel under **Settings → Environment Variables**. Mark them for 
 | `MIGRATE_DATABASE_URL` | **direct** (unpooled) connection string | with Neon |
 | `NAMESAKE_URL` | `https://namesake.alora.tech` | **yes** |
 | `RESEND_API_KEY` | from step 2 | yes, to let anyone sign in |
-| `NAMESAKE_FROM_EMAIL` | `Namesake <hello@alora.tech>` | with Resend |
+| `NAMESAKE_FROM_EMAIL` | `Namesake <hello@namesake.alora.tech>` — must match the verified domain | with Resend |
+| `NAMESAKE_SUPPORT_EMAIL` | where refund requests go; shown on `/refunds` | no |
 | `STRIPE_SECRET_KEY` | `sk_test_…` from step 3 | to demo buying |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from step 6 | with Stripe |
 | `ANTHROPIC_API_KEY` | your key | no — falls back to mock replies |

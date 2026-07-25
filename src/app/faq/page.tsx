@@ -151,6 +151,24 @@ export default function FaqPage() {
           </p>
         </Answer>
 
+        <Answer q="Can we get a refund?">
+          <p>
+            Any time before the journey is opened — including a gift that was never claimed, with
+            no time limit on it. Once it&apos;s been opened, fourteen days.
+          </p>
+          <p>
+            Boxes are refundable until they&apos;re posted. The one thing that isn&apos;t is a
+            personalised keepsake once it&apos;s been made, because it has their name on it.{" "}
+            <Link
+              href="/refunds"
+              className="font-semibold text-sage-deep underline underline-offset-4 hover:text-pewter"
+            >
+              The whole policy
+            </Link>{" "}
+            is a short read.
+          </p>
+        </Answer>
+
         <Answer q="What actually arrives in the box?">
           <p>
             Two cards. One in your own words, carrying the link that opens their journey. One for
@@ -178,7 +196,13 @@ export default function FaqPage() {
 
       <footer className="border-t border-line pt-7 text-center">
         <DuckMark className="mx-auto h-4 w-auto text-pewter-light" />
-        <p className="mt-2.5 text-sm text-ink-soft">Namesake</p>
+        <p className="mt-2.5 text-sm text-ink-soft">
+          <Link href="/faq" className="hover:text-sage-deep">Questions</Link>
+          <span className="mx-2 text-line">·</span>
+          <Link href="/refunds" className="hover:text-sage-deep">Refunds</Link>
+          <span className="mx-2 text-line">·</span>
+          Namesake
+        </p>
       </footer>
     </main>
   );

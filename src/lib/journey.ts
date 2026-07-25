@@ -2,10 +2,13 @@ import { z } from "zod";
 import { nanoid, customAlphabet } from "nanoid";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
+import { DEFAULT_PARTNER_NAME } from "@/lib/seat";
 
 const slugId = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 10);
 
-const PALETTE = ["#c98ba5", "#7ba7bc"];
+// Avatar tints — sage and antique brass, so the two of you are told apart at a
+// glance without either colour fighting the rest of the page.
+const PALETTE = ["#7d8f76", "#a98a4f"];
 
 // What the start form collects. The draft rides inside the signup magic link,
 // so the journey isn't created until the owner has proven their address.
@@ -17,8 +20,12 @@ export const journeyDraft = z.object({
     name: z.string().trim().min(1).max(60),
     email: z.string().trim().email(),
   }),
+  // The partner's name is optional: plenty of people start this on their own,
+  // before they've told anyone, and being made to type someone else's name is
+  // a strange first hurdle. The seat is still created — it just waits to be
+  // named until they claim it.
   partner: z.object({
-    name: z.string().trim().min(1).max(60),
+    name: z.string().trim().max(60).optional().or(z.literal("")),
     email: z.string().trim().email().optional().or(z.literal("")),
   }),
 });
@@ -55,7 +62,7 @@ export async function createJourney(
             isOwner: true,
           },
           {
-            name: draft.partner.name,
+            name: draft.partner.name?.trim() || DEFAULT_PARTNER_NAME,
             email: draft.partner.email || null,
             color: PALETTE[1],
             token: nanoid(24),

@@ -241,7 +241,11 @@ export default function GiftForm({
           </button>
           <p className="mt-2 text-center text-xs leading-relaxed text-ink-soft">
             Paid once — no subscription for them to cancel.
-            {tier.physical ? " We'll ask where to post it at checkout." : ""}
+            {tier.physical ? " We'll ask where to post it at checkout." : ""} Fully{" "}
+            <a href="/refunds" className="underline underline-offset-2 hover:text-sage-deep">
+              refundable
+            </a>{" "}
+            for as long as it stays unopened.
           </p>
         </section>
       </div>

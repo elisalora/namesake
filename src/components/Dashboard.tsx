@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { WorkspaceState } from "@/lib/workspace";
+import { seatLabel } from "@/lib/seat";
 import ChatPanel from "./ChatPanel";
 import ShortlistPanel from "./ShortlistPanel";
 import SignOutButton from "./SignOutButton";
@@ -442,7 +443,7 @@ function InviteByEmail({ ws }: { ws: WorkspaceState }) {
   async function send() {
     setError(null);
     if (!email.trim()) {
-      setError(`Add ${seat.name}'s email address.`);
+      setError(`Add ${seatLabel(seat.name)}'s email address.`);
       return;
     }
     setState("sending");
@@ -464,7 +465,7 @@ function InviteByEmail({ ws }: { ws: WorkspaceState }) {
 
   return (
     <div className="rounded-2xl border border-line bg-paper p-4">
-      <div className="text-sm font-semibold text-ink">Invite {seat.name}</div>
+      <div className="text-sm font-semibold text-ink">Invite {seatLabel(seat.name)}</div>
       {state === "sent" ? (
         <div className="mt-2 text-sm text-ink-soft">
           Sent to <span className="font-semibold text-ink">{email.trim()}</span> — their link works
@@ -482,7 +483,7 @@ function InviteByEmail({ ws }: { ws: WorkspaceState }) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={`${seat.name.toLowerCase()}@example.com`}
+              placeholder="them@example.com"
               className="min-w-0 flex-1 rounded-xl border border-line bg-card px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-sage"
             />
             <button
