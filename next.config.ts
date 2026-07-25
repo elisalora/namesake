@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Keep native / Prisma packages out of the bundler so better-sqlite3's
-  // native addon loads correctly at runtime.
-  serverExternalPackages: ["@prisma/client", "@prisma/adapter-better-sqlite3", "better-sqlite3"],
+  // Keep Prisma and its driver out of the bundler so they resolve normally at
+  // runtime rather than being traced into the serverless output.
+  serverExternalPackages: ["@prisma/client", "@prisma/adapter-pg", "pg"],
 };
 
 export default nextConfig;

@@ -1,0 +1,145 @@
+# Deploying Namesake
+
+Written for putting it on `namesake.alora.tech` as a demo you can show people. Everything
+in the app is ready; what's left needs your accounts, so it's yours to click through.
+
+Do it in this order — each step produces something the next one needs.
+
+---
+
+## 1. A database
+
+Anything that speaks Postgres works. Two easy options:
+
+- **[Prisma Postgres](https://console.prisma.io)** — same people as the ORM, has a free tier
+- **[Neon](https://neon.tech)** — free tier, very fast to set up
+
+Create a database and copy the connection string. It looks like:
+
+```
+postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require
+```
+
+> **Why not SQLite:** Vercel's filesystem is ephemeral. A SQLite file would be thrown away
+> on every deploy and every cold start, taking every journey, user and purchase with it.
+
+You don't need to run migrations by hand — the build command does it (see step 5).
+
+---
+
+## 2. Email — required, or nobody can sign in
+
+Namesake has no passwords. Without a mail provider, magic links are only printed to the
+server log, which on a deployed box means **only you can read them, so only you can log
+in**. This is the step people skip and then wonder why their demo doesn't work.
+
+1. Sign up at [Resend](https://resend.com) and create an API key.
+2. Verify a sending domain. `alora.tech` is fine — you do **not** need to verify the
+   subdomain separately. Resend will give you DNS records (DKIM etc.) to add at your
+   registrar alongside the CNAME from step 4.
+3. Note the address you'll send from, e.g. `Namesake <hello@alora.tech>`.
+
+---
+
+## 3. Stripe — test mode
+
+1. In the Stripe dashboard, make sure you're in **test mode** (the toggle, top right).
+2. Copy the **secret key** (`sk_test_…`).
+3. Leave the webhook for step 6 — it needs the live URL first.
+
+In test mode, card `4242 4242 4242 4242` with any future expiry and any CVC completes a
+purchase and charges nothing. That's what you want for a demo.
+
+> Checkout refuses outright if `STRIPE_SECRET_KEY` is missing, rather than sending buyers
+> to a dead link. So you can deploy without it — you just won't be able to demo buying.
+
+---
+
+## 4. Vercel, and the DNS record
+
+1. Import `github.com/elisalora/namesake` at [vercel.com/new](https://vercel.com/new).
+2. Framework preset: **Next.js**. Leave the build settings alone — `package.json` already
+   runs migrations before the build.
+3. Add the environment variables from step 5 **before** the first deploy, or it will fail
+   at `prisma migrate deploy` with no `DATABASE_URL`.
+4. Deploy.
+5. In **Settings → Domains**, add `namesake.alora.tech`. Vercel will show you the record
+   to create at whoever hosts DNS for `alora.tech`:
+
+   ```
+   Type    Name        Value
+   CNAME   namesake    cname.vercel-dns.com
+   ```
+
+   (Use whatever value Vercel actually shows — it occasionally differs.)
+
+---
+
+## 5. Environment variables
+
+Set these in Vercel under **Settings → Environment Variables**. Mark them for Production
+(and Preview, if you want preview deploys to work).
+
+| Variable | Value | Required? |
+|---|---|---|
+| `DATABASE_URL` | connection string from step 1 | **yes** |
+| `NAMESAKE_URL` | `https://namesake.alora.tech` | **yes** |
+| `RESEND_API_KEY` | from step 2 | yes, to let anyone sign in |
+| `NAMESAKE_FROM_EMAIL` | `Namesake <hello@alora.tech>` | with Resend |
+| `STRIPE_SECRET_KEY` | `sk_test_…` from step 3 | to demo buying |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_…` from step 6 | with Stripe |
+| `ANTHROPIC_API_KEY` | your key | no — falls back to mock replies |
+| `NAMESAKE_ADMIN_EMAILS` | your email | to see `/admin/orders` |
+
+`NAMESAKE_URL` matters more than it looks: it's what every magic link, gift link and
+shower QR is built from. Get it wrong and the QR on a printed card points somewhere dead.
+
+Everything else — prices, shipping countries, model choice — has a working default. See
+`.env.example`.
+
+---
+
+## 6. The Stripe webhook
+
+Only possible once the URL exists, which is why it's last.
+
+1. Stripe dashboard → **Developers → Webhooks → Add endpoint**.
+2. Endpoint URL: `https://namesake.alora.tech/api/stripe/webhook`
+3. Event: **`checkout.session.completed`** (that's the only one it listens for).
+4. Copy the signing secret (`whsec_…`) into `STRIPE_WEBHOOK_SECRET` in Vercel, and redeploy.
+
+**The webhook is what grants access, not the browser coming back from Stripe.** Without
+this secret the endpoint refuses everything — someone can pay and never receive what they
+bought. Worth testing once with a real test purchase.
+
+---
+
+## 7. Check it works
+
+Walk the whole loop once as a stranger would:
+
+1. Open `https://namesake.alora.tech` and start a journey.
+2. Pay with `4242 4242 4242 4242`.
+3. Check the email arrives, open the link, and land in the dashboard.
+4. Open **Share → Having a shower?** and confirm the QR points at
+   `https://namesake.alora.tech/s/…` and not `localhost`.
+5. If you bought a boxed tier, check `/admin/orders` shows it with an address.
+
+---
+
+## Things worth knowing
+
+**It's a public URL.** Anyone who finds it can create a journey. In Stripe test mode that
+costs nobody anything, but don't switch to live keys until you actually want to sell.
+
+**Test data isn't real data.** The local `dev.db` from development isn't carried over, and
+the migration history was rebuilt for Postgres. Production starts empty, which is right.
+
+**Journeys expire.** Anything you create for a demo runs out on its tier's schedule. If a
+demo journey goes read-only mid-conversation, that's the paywall working — extend it, or
+adjust `expiresAt` directly in the database.
+
+**Watch the Anthropic spend.** The consultant is the main variable cost and there's no
+per-journey token cap yet. On a public demo URL that's worth an eye on your usage; leaving
+`ANTHROPIC_API_KEY` unset makes the chat run on mock replies, which is enough to show the
+shape of the product without spending anything.

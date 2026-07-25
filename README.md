@@ -7,20 +7,28 @@ family & friends, and end with a keepsake page you keep for the baby book.
 ## Stack
 
 - **Next.js 16** (App Router, TypeScript, Tailwind v4)
-- **Prisma 7 + SQLite** (via the `better-sqlite3` driver adapter) — swaps to Postgres for prod
+- **Prisma 7 + Postgres** (via the `@prisma/adapter-pg` driver adapter)
 - **Claude** (Anthropic SDK) powers the consultant chat, streaming, model set in `.env`
 - **Stripe Checkout** for one-time payments — no subscriptions, no customer portal
 
 ## Run it locally
 
 ```bash
-npm install
-npx prisma migrate dev   # creates dev.db (already done once)
-npm run dev              # http://localhost:3000
+# A throwaway Postgres to develop against
+docker run -d --name namesake-pg -e POSTGRES_PASSWORD=namesake \
+  -e POSTGRES_DB=namesake -p 55432:5432 postgres:17-alpine
+
+cp .env.example .env      # the default DATABASE_URL matches the container above
+npm install               # also generates the Prisma client
+npx prisma migrate dev    # creates the schema
+npm run dev               # http://localhost:3000
 ```
 
-The app is fully usable without an API key — the consultant runs on graceful mock replies
-and shows a "preview mode" note.
+The app is fully usable with an otherwise empty `.env`: the consultant runs on graceful
+mock replies, magic links print to the console, and checkout routes to a page that can
+simulate a payment. Only the database is genuinely required.
+
+To deploy it, see **[DEPLOY.md](./DEPLOY.md)**.
 
 ## Turn the consultant fully on
 
