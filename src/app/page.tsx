@@ -14,6 +14,9 @@ export default function Home() {
           <span className="font-display text-2xl tracking-tight text-pewter">Namesake</span>
         </div>
         <div className="flex items-center gap-6 text-sm text-ink-soft">
+          <Link href="/faq" className="transition hover:text-sage-deep">
+            Questions
+          </Link>
           <Link href="/gift" className="transition hover:text-sage-deep">
             Give as a gift
           </Link>
@@ -32,9 +35,10 @@ export default function Home() {
             thing you <span className="italic text-sage-deep">give them.</span>
           </h1>
           <p className="mt-7 max-w-md text-lg leading-relaxed text-ink-soft">
-            A private room for the two of you. Think it through with a consultant who asks
-            good questions, keep a shortlist nobody else can see, draw on the people you
-            love — and end with a page telling the story of the name you chose.
+            One place for the two of you: names gathered, rated and quietly set aside;
+            everyone else&apos;s suggestions landing somewhere useful instead of over dinner; an
+            AI consultant to think out loud with. It ends with a page telling the story of the
+            name you chose.
           </p>
 
           <OrnamentRule className="mt-10 max-w-md" />
@@ -42,16 +46,16 @@ export default function Home() {
           <ul className="mt-8 grid max-w-lg gap-x-8 gap-y-6 sm:grid-cols-2">
             {[
               [
+                "Two opinions, one place",
+                "Rate, note, and quietly set aside. Neither of you has to defend anything out loud.",
+              ],
+              [
+                "Somewhere to put everyone else",
+                "A card at the shower they can scan — so opinions arrive where you can look at them later, not across a table.",
+              ],
+              [
                 "A consultant, not a search box",
-                "Someone who asks about your grandmother, not just your favourite letter.",
-              ],
-              [
-                "Two opinions, kept private",
-                "Rate, note, and quietly veto. Nobody has to defend anything out loud.",
-              ],
-              [
-                "The room, invited",
-                "A card at the shower everyone can scan — so opinions arrive somewhere useful.",
+                "An AI that asks about your grandmother, not just your favourite letter — and is awake at three in the morning, when the question tends to arrive.",
               ],
               ["Something to keep", "The name, and why you chose it. Printed, for the baby book."],
             ].map(([t, d]) => (

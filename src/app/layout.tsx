@@ -23,7 +23,7 @@ const jost = Jost({
 export const metadata: Metadata = {
   title: "Namesake — the naming of a child",
   description:
-    "A private room where two people choose the name their child will carry — with a consultant to think it through, the people you love to draw on, and a keepsake at the end.",
+    "A private room where two people choose the name their child will carry — with an AI consultant to think it through, the people you love to draw on, and a keepsake at the end.",
 };
 
 export default function RootLayout({

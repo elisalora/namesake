@@ -39,6 +39,9 @@ export default function GiftPage() {
           <span className="font-display text-2xl tracking-tight text-pewter">Namesake</span>
         </Link>
         <div className="flex items-center gap-6 text-sm text-ink-soft">
+          <Link href="/faq" className="transition hover:text-sage-deep">
+            Questions
+          </Link>
           <Link href="/" className="transition hover:text-sage-deep">
             For ourselves
           </Link>
@@ -56,8 +59,8 @@ export default function GiftPage() {
           they&apos;ll <span className="italic text-sage-deep">give their child.</span>
         </h1>
         <p className="mx-auto mt-7 max-w-xl text-lg leading-relaxed text-ink-soft">
-          You&apos;re giving them the choosing of it — a private room for the two of them,
-          someone thoughtful to think it through with, and the story of the name at the end.
+          You&apos;re giving them the choosing of it — a private room for the two of them, an AI
+          consultant that knows where every name comes from, and the story of the name at the end.
         </p>
 
         {/* The question a gifter actually has, answered before the prices. */}

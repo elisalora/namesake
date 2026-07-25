@@ -99,7 +99,10 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
         <span className="grid h-8 w-8 place-items-center rounded-full bg-pewter text-sm text-white">✦</span>
         <div>
           <div className="font-display text-lg leading-none text-ink">Your consultant</div>
-          <div className="text-xs text-ink-soft">here to help, never to push</div>
+          {/* Says plainly what it is. Someone paying to be advised deserves to
+              know they're being advised by software — and it's persistent
+              rather than a one-time notice, so it's true every time they look. */}
+          <div className="text-xs text-ink-soft">An AI — unhurried, and awake at 3am</div>
         </div>
       </div>
 

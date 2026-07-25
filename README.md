@@ -1,8 +1,8 @@
 # Namesake
 
-A warm, collaborative baby-name journey for expecting parents — talk it through with a
-thoughtful consultant, shortlist together (rate, comment, gently veto), gather ideas from
-family & friends, and end with a keepsake page you keep for the baby book.
+A collaborative baby-name journey for expecting parents — think it out loud with an AI
+consultant, shortlist together (rate, comment, quietly veto), gather ideas from family &
+friends, and end with a keepsake page you keep for the baby book.
 
 ## Stack
 
