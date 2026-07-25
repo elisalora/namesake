@@ -96,12 +96,12 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
         />
       </div>
 
-      {error && <p className="text-sm text-rose-deep">{error}</p>}
+      {error && <p className="text-sm text-sage-deep">{error}</p>}
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-full bg-rose-deep py-3.5 font-display text-lg text-white transition hover:bg-plum disabled:opacity-60"
+        className="w-full rounded-full bg-sage-deep py-3.5 font-display text-lg text-white transition hover:bg-pewter disabled:opacity-60"
       >
         {loading ? "Taking you to checkout…" : `Begin the journey · ${priceLabel}`}
       </button>
@@ -142,7 +142,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-rose focus:bg-card"
+        className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-sage focus:bg-card"
       />
     </label>
   );

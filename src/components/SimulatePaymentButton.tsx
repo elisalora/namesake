@@ -38,11 +38,11 @@ export default function SimulatePaymentButton({
       <button
         onClick={pay}
         disabled={busy}
-        className="w-full rounded-full bg-rose-deep py-3.5 font-display text-lg text-white transition hover:bg-plum disabled:opacity-60"
+        className="w-full rounded-full bg-sage-deep py-3.5 font-display text-lg text-white transition hover:bg-pewter disabled:opacity-60"
       >
         {busy ? "Processing…" : "Simulate a successful payment"}
       </button>
-      {error && <p className="mt-2 text-sm text-rose-deep">{error}</p>}
+      {error && <p className="mt-2 text-sm text-sage-deep">{error}</p>}
     </>
   );
 }

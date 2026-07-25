@@ -20,11 +20,11 @@ export default async function SignInPage(props: {
 
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-12">
-      <Link href="/" className="font-display text-2xl font-semibold tracking-tight text-plum">
+      <Link href="/" className="font-display text-2xl font-semibold tracking-tight text-pewter">
         Namesake
       </Link>
 
-      <div className="animate-rise mt-6 rounded-3xl border border-line bg-card p-7 shadow-[0_20px_60px_-30px_rgba(111,77,107,0.4)]">
+      <div className="animate-rise mt-6 rounded-3xl border border-line bg-card p-7 shadow-[0_20px_60px_-30px_rgba(65,74,69,0.4)]">
         <h1 className="font-display text-3xl text-ink">Welcome back</h1>
         <p className="mb-6 mt-1 text-sm text-ink-soft">
           Enter the email you started your journey with.
@@ -41,7 +41,7 @@ export default async function SignInPage(props: {
 
       <p className="mt-6 text-center text-sm text-ink-soft">
         Haven&apos;t started yet?{" "}
-        <Link href="/" className="font-semibold text-rose-deep hover:text-plum">
+        <Link href="/" className="font-semibold text-sage-deep hover:text-pewter">
           Begin a journey
         </Link>
       </p>

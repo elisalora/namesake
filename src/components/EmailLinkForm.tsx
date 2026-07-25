@@ -62,16 +62,16 @@ export default function EmailLinkForm({
           onChange={(e) => setEmail(e.target.value)}
           placeholder={placeholder}
           autoComplete="email"
-          className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-rose focus:bg-card"
+          className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-sage focus:bg-card"
         />
       </label>
 
-      {error && <p className="text-sm text-rose-deep">{error}</p>}
+      {error && <p className="text-sm text-sage-deep">{error}</p>}
 
       <button
         type="submit"
         disabled={state === "sending"}
-        className="w-full rounded-full bg-rose-deep py-3.5 font-display text-lg text-white transition hover:bg-plum disabled:opacity-60"
+        className="w-full rounded-full bg-sage-deep py-3.5 font-display text-lg text-white transition hover:bg-pewter disabled:opacity-60"
       >
         {state === "sending" ? "Sending…" : cta}
       </button>
@@ -86,7 +86,7 @@ export function CheckYourEmail({ email, devUrl }: { email: string; devUrl: strin
   return (
     <div className="animate-rise text-center">
       <div className="text-4xl">💌</div>
-      <div className="mt-3 font-display text-2xl text-plum">Check your email</div>
+      <div className="mt-3 font-display text-2xl text-pewter">Check your email</div>
       <p className="mt-2 text-sm leading-relaxed text-ink-soft">
         We sent a link to <span className="font-semibold text-ink">{email}</span>. Tap it and
         you&apos;re in — it works once, and expires in 30 minutes.
@@ -99,7 +99,7 @@ export function CheckYourEmail({ email, devUrl }: { email: string; devUrl: strin
           </div>
           <a
             href={devUrl}
-            className="mt-2 inline-block rounded-full bg-plum px-5 py-2.5 font-display text-white transition hover:bg-rose-deep"
+            className="mt-2 inline-block rounded-full bg-pewter px-5 py-2.5 font-display text-white transition hover:bg-sage-deep"
           >
             Open the link →
           </a>

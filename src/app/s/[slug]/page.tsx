@@ -24,7 +24,7 @@ export default async function SuggestPage(props: { params: Promise<{ slug: strin
     return (
       <main className="mx-auto flex max-w-lg flex-1 flex-col items-center justify-center px-6 py-16 text-center">
         <div className="mb-3 text-3xl">✦</div>
-        <h1 className="font-display text-3xl text-plum">They&apos;ve chosen a name!</h1>
+        <h1 className="font-display text-3xl text-pewter">They&apos;ve chosen a name!</h1>
         <p className="mt-3 text-ink-soft">
           {parentLine} have already found the name for {ws.babyLabel}. Thank you so much for being
           part of it.
@@ -36,11 +36,11 @@ export default async function SuggestPage(props: { params: Promise<{ slug: strin
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-6 py-12">
       <header className="mb-8 text-center">
-        <Link href="/" className="font-display text-lg font-semibold text-plum">
+        <Link href="/" className="font-display text-lg font-semibold text-pewter">
           Namesake
         </Link>
         <h1 className="mt-6 font-display text-4xl leading-tight text-ink">
-          Help {parentLine} name <span className="italic text-rose-deep">{ws.babyLabel}</span>
+          Help {parentLine} name <span className="italic text-sage-deep">{ws.babyLabel}</span>
         </h1>
         <p className="mt-3 text-ink-soft">
           They&apos;d love your ideas. Suggest a name you adore — a family name, one with a story,

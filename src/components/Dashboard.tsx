@@ -59,7 +59,7 @@ export default function Dashboard({
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-line bg-paper/85 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-3">
-          <Link href="/" className="font-display text-xl font-semibold text-plum">
+          <Link href="/" className="font-display text-xl font-semibold text-pewter">
             Namesake
           </Link>
           <div className="hidden items-center gap-2 text-sm text-ink-soft sm:flex">
@@ -82,7 +82,7 @@ export default function Dashboard({
             </div>
             <button
               onClick={() => setShare(true)}
-              className="rounded-full border border-line bg-card px-3 py-1.5 text-sm text-plum transition hover:border-rose"
+              className="rounded-full border border-line bg-card px-3 py-1.5 text-sm text-pewter transition hover:border-sage"
             >
               Share
             </button>
@@ -90,7 +90,7 @@ export default function Dashboard({
             {!decided && !ws.expired && (
               <button
                 onClick={() => setDecideOpen("")}
-                className="rounded-full bg-rose-deep px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-plum"
+                className="rounded-full bg-sage-deep px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-pewter"
               >
                 Decide together
               </button>
@@ -113,7 +113,7 @@ export default function Dashboard({
               key={t}
               onClick={() => setMobileTab(t)}
               className={`flex-1 rounded-full py-2 font-semibold transition ${
-                mobileTab === t ? "bg-plum text-white" : "text-ink-soft"
+                mobileTab === t ? "bg-pewter text-white" : "text-ink-soft"
               }`}
             >
               {t === "chat" ? "Consultant" : `Shortlist${ws.names.length ? ` (${ws.names.length})` : ""}`}
@@ -172,7 +172,7 @@ function RevealOverlay({
       <Confetti />
       <div className="animate-rise relative">
         <div className="font-display text-sm uppercase tracking-[0.35em] text-gold">Your baby&apos;s name is</div>
-        <h1 className="mt-6 font-display text-6xl leading-tight text-plum sm:text-8xl">{full}</h1>
+        <h1 className="mt-6 font-display text-6xl leading-tight text-pewter sm:text-8xl">{full}</h1>
         <div className="mx-auto my-8 flex items-center justify-center gap-3 text-gold">
           <span className="h-px w-16 bg-gold/50" />
           <span className="text-xl">✦</span>
@@ -209,7 +209,7 @@ function DecidedBanner({
       <Confetti />
       <div className="relative mx-auto max-w-7xl px-5 py-6 text-center">
         <div className="text-xs uppercase tracking-widest text-[#8a6d1f]">You chose a name</div>
-        <div className="font-display text-4xl text-plum sm:text-5xl">{full}</div>
+        <div className="font-display text-4xl text-pewter sm:text-5xl">{full}</div>
         {ws.decidedReason && <p className="mx-auto mt-2 max-w-2xl text-ink-soft">“{ws.decidedReason}”</p>}
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <Link
@@ -224,7 +224,7 @@ function DecidedBanner({
           >
             Copy keepsake link
           </button>
-          <button onClick={onReopen} className="rounded-full px-4 py-2.5 text-sm text-ink-soft hover:text-plum">
+          <button onClick={onReopen} className="rounded-full px-4 py-2.5 text-sm text-ink-soft hover:text-pewter">
             Keep exploring
           </button>
         </div>
@@ -285,7 +285,7 @@ function CopyRow({ label, url }: { label: string; url: string }) {
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           }}
-          className="rounded-xl bg-plum px-3 py-2 text-sm font-semibold text-white"
+          className="rounded-xl bg-pewter px-3 py-2 text-sm font-semibold text-white"
         >
           {copied ? "Copied!" : "Copy"}
         </button>
@@ -324,12 +324,12 @@ function WindowBanner({ ws }: { ws: WorkspaceState }) {
   }
 
   return (
-    <div className={`border-b ${ws.expired ? "border-line bg-blush/60" : "border-line bg-card/60"}`}>
+    <div className={`border-b ${ws.expired ? "border-line bg-butter-soft/60" : "border-line bg-card/60"}`}>
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3">
         <div className="text-sm text-ink-soft">
           {ws.expired ? (
             <>
-              <span className="font-display text-base text-plum">Your window has closed.</span>{" "}
+              <span className="font-display text-base text-pewter">Your window has closed.</span>{" "}
               Everything here is still yours to read — add more time whenever you&apos;re ready.
             </>
           ) : (
@@ -340,12 +340,12 @@ function WindowBanner({ ws }: { ws: WorkspaceState }) {
               in your journey. No rush — you can add more time whenever.
             </>
           )}
-          {error && <span className="ml-2 text-rose-deep">{error}</span>}
+          {error && <span className="ml-2 text-sage-deep">{error}</span>}
         </div>
         <button
           onClick={extend}
           disabled={busy}
-          className="shrink-0 rounded-full bg-rose-deep px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-plum disabled:opacity-60"
+          className="shrink-0 rounded-full bg-sage-deep px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-pewter disabled:opacity-60"
         >
           {busy ? "One moment…" : "Add another month"}
         </button>
@@ -368,7 +368,7 @@ function WelcomeModal({
   return (
     <Modal onClose={onClose}>
       <div className="text-center">
-        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-blush text-2xl">✦</div>
+        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-butter-soft text-2xl">✦</div>
         <h2 className="font-display text-2xl text-ink">Your space is ready</h2>
         <p className="mt-1 text-sm text-ink-soft">
           This is just for the two of you. Invite your partner in so you can name {ws.babyLabel}{" "}
@@ -380,7 +380,7 @@ function WelcomeModal({
         {inviteUrl && <CopyRow label="Or hand them this link" url={inviteUrl} />}
         <CopyRow label="Ask family & friends for ideas (optional)" url={familyUrl} />
       </div>
-      <button onClick={onClose} className="mt-6 w-full rounded-full bg-rose-deep py-3 font-display text-white transition hover:bg-plum">
+      <button onClick={onClose} className="mt-6 w-full rounded-full bg-sage-deep py-3 font-display text-white transition hover:bg-pewter">
         Start naming
       </button>
     </Modal>
@@ -412,7 +412,7 @@ function ShareModal({
         <CopyRow label="Family & friends suggestion link" url={familyUrl} />
         <Link
           href={`/w/${ws.id}/shower`}
-          className="flex items-center justify-between rounded-2xl border border-line bg-paper p-4 transition hover:border-rose"
+          className="flex items-center justify-between rounded-2xl border border-line bg-paper p-4 transition hover:border-sage"
         >
           <span>
             <span className="block text-sm font-semibold text-ink">Having a shower?</span>
@@ -423,7 +423,7 @@ function ShareModal({
           <span className="ml-3 shrink-0 text-ink-soft">→</span>
         </Link>
       </div>
-      <button onClick={onClose} className="mt-6 w-full rounded-full border border-line py-2.5 text-plum">
+      <button onClick={onClose} className="mt-6 w-full rounded-full border border-line py-2.5 text-pewter">
         Done
       </button>
     </Modal>
@@ -470,7 +470,7 @@ function InviteByEmail({ ws }: { ws: WorkspaceState }) {
           Sent to <span className="font-semibold text-ink">{email.trim()}</span> — their link works
           once and expires in 30 minutes.
           {devUrl && (
-            <a href={devUrl} className="mt-2 block font-semibold text-rose-deep hover:text-plum">
+            <a href={devUrl} className="mt-2 block font-semibold text-sage-deep hover:text-pewter">
               Dev mode · open their link →
             </a>
           )}
@@ -483,17 +483,17 @@ function InviteByEmail({ ws }: { ws: WorkspaceState }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder={`${seat.name.toLowerCase()}@example.com`}
-              className="min-w-0 flex-1 rounded-xl border border-line bg-card px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-rose"
+              className="min-w-0 flex-1 rounded-xl border border-line bg-card px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-sage"
             />
             <button
               onClick={send}
               disabled={state === "sending"}
-              className="shrink-0 rounded-full bg-rose-deep px-4 py-2 text-sm font-semibold text-white transition hover:bg-plum disabled:opacity-60"
+              className="shrink-0 rounded-full bg-sage-deep px-4 py-2 text-sm font-semibold text-white transition hover:bg-pewter disabled:opacity-60"
             >
               {state === "sending" ? "Sending…" : "Send"}
             </button>
           </div>
-          {error && <p className="mt-2 text-sm text-rose-deep">{error}</p>}
+          {error && <p className="mt-2 text-sm text-sage-deep">{error}</p>}
         </>
       )}
     </div>
@@ -548,11 +548,11 @@ function DecideModal({
                   key={n.id}
                   onClick={() => setNameId(n.id)}
                   className={`flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-left transition ${
-                    nameId === n.id ? "border-rose bg-blush" : "border-line bg-paper hover:border-rose/50"
+                    nameId === n.id ? "border-sage bg-butter-soft" : "border-line bg-paper hover:border-sage/50"
                   }`}
                 >
                   <span className="font-display text-lg text-ink">{full}</span>
-                  {nameId === n.id && <span className="text-rose-deep">✦</span>}
+                  {nameId === n.id && <span className="text-sage-deep">✦</span>}
                 </button>
               );
             })}
@@ -562,7 +562,7 @@ function DecideModal({
             onChange={(e) => setReason(e.target.value)}
             rows={3}
             placeholder="Why this name? (the meaning, the story, the feeling…)"
-            className="mt-4 w-full resize-none rounded-xl border border-line bg-paper px-3 py-2.5 text-sm outline-none focus:border-rose"
+            className="mt-4 w-full resize-none rounded-xl border border-line bg-paper px-3 py-2.5 text-sm outline-none focus:border-sage"
           />
           <div className="mt-5 flex gap-2">
             <button onClick={onClose} className="flex-1 rounded-full border border-line py-2.5 text-ink-soft">

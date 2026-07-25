@@ -18,11 +18,11 @@ export default async function DevCheckoutPage(props: { params: Promise<{ id: str
 
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-12">
-      <Link href="/" className="font-display text-2xl font-semibold tracking-tight text-plum">
+      <Link href="/" className="font-display text-2xl font-semibold tracking-tight text-pewter">
         Namesake
       </Link>
 
-      <div className="animate-rise mt-6 rounded-3xl border border-line bg-card p-7 shadow-[0_20px_60px_-30px_rgba(111,77,107,0.4)]">
+      <div className="animate-rise mt-6 rounded-3xl border border-line bg-card p-7 shadow-[0_20px_60px_-30px_rgba(65,74,69,0.4)]">
         <div className="rounded-xl border border-dashed border-line bg-paper px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-soft">
           Dev mode · no Stripe key configured
         </div>
@@ -47,7 +47,7 @@ export default async function DevCheckoutPage(props: { params: Promise<{ id: str
           <span className="text-sm text-ink-soft">
             {purchase.recipientEmail ? `Gift for ${purchase.recipientEmail}` : "Total"}
           </span>
-          <span className="font-display text-2xl text-plum">
+          <span className="font-display text-2xl text-pewter">
             {formatPrice(purchase.amountCents, purchase.currency)}
           </span>
         </div>
@@ -66,14 +66,14 @@ export default async function DevCheckoutPage(props: { params: Promise<{ id: str
               {purchase.kind === "extend" ? (
                 <Link
                   href={`/w/${purchase.workspaceId}`}
-                  className="font-semibold text-rose-deep hover:text-plum"
+                  className="font-semibold text-sage-deep hover:text-pewter"
                 >
                   Back to the journey →
                 </Link>
               ) : (
                 <Link
                   href={`/redeem/${purchase.redeemCode}`}
-                  className="font-semibold text-rose-deep hover:text-plum"
+                  className="font-semibold text-sage-deep hover:text-pewter"
                 >
                   Open it →
                 </Link>

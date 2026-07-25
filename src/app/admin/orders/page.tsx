@@ -35,7 +35,7 @@ export default async function OrdersPage(props: {
         <h1 className="font-display text-3xl text-ink">Orders to pack</h1>
         <a
           href={showAll ? "/admin/orders" : "/admin/orders?show=all"}
-          className="text-sm font-semibold text-ink-soft hover:text-rose-deep"
+          className="text-sm font-semibold text-ink-soft hover:text-sage-deep"
         >
           {showAll ? "Show only outstanding" : "Show fulfilled too"}
         </a>
@@ -126,7 +126,7 @@ export default async function OrdersPage(props: {
                           .join("\n")}
                       </address>
                     ) : (
-                      <p className="mt-1 text-sm text-rose-deep">
+                      <p className="mt-1 text-sm text-sage-deep">
                         No address captured — check the Stripe session.
                       </p>
                     )}

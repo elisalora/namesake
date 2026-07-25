@@ -1,5 +1,6 @@
 import Link from "next/link";
 import GiftForm from "@/components/GiftForm";
+import DuckMark, { OrnamentRule } from "@/components/DuckMark";
 import { GIFT_TIERS, ADD_ONS, formatPrice, describeWindow } from "@/lib/pricing";
 
 export const metadata = {
@@ -33,33 +34,32 @@ export default function GiftPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 py-10">
       <header className="flex items-center justify-between">
-        <Link href="/" className="font-display text-2xl font-semibold tracking-tight text-plum">
-          Namesake
+        <Link href="/" className="flex items-center gap-2.5">
+          <DuckMark className="h-5 w-auto text-pewter-light" />
+          <span className="font-display text-2xl tracking-tight text-pewter">Namesake</span>
         </Link>
-        <div className="flex items-center gap-5 text-sm text-ink-soft">
-          <Link href="/" className="font-semibold transition hover:text-rose-deep">
+        <div className="flex items-center gap-6 text-sm text-ink-soft">
+          <Link href="/" className="transition hover:text-sage-deep">
             For ourselves
           </Link>
-          <Link href="/signin" className="font-semibold transition hover:text-rose-deep">
+          <Link href="/signin" className="transition hover:text-sage-deep">
             Sign in
           </Link>
         </div>
       </header>
 
-      <section className="animate-rise py-12 text-center">
-        <p className="mb-4 inline-block rounded-full border border-line bg-card px-3 py-1 text-xs font-semibold uppercase tracking-wide text-rose-deep">
-          A gift for expecting parents
-        </p>
-        <h1 className="mx-auto max-w-2xl font-display text-5xl leading-[1.05] text-ink sm:text-6xl">
+      <section className="animate-rise py-14 text-center">
+        <p className="engraved">A gift for expecting parents</p>
+        <h1 className="mx-auto mt-5 max-w-3xl font-display text-6xl leading-[1.02] text-ink sm:text-7xl">
           Everyone has an opinion.
           <br />
-          <span className="italic text-rose-deep">Give them a better way to hear it.</span>
+          <span className="italic text-sage-deep">Give them somewhere to put it.</span>
         </h1>
-        <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-ink-soft">
-          A private space where the two of them talk it through with a thoughtful consultant,
-          gather ideas from the people they love, and arrive at a name they both adore — with a
-          keepsake page about why they chose it.
+        <p className="mx-auto mt-7 max-w-xl text-lg leading-relaxed text-ink-soft">
+          The two of them get a private room and someone thoughtful to think it through with.
+          Everyone else gets a card to scan. You get to be the one who gave it.
         </p>
+        <OrnamentRule className="mx-auto mt-10 max-w-xs" />
       </section>
 
       <GiftForm tiers={tiers} addOns={addOns} />
@@ -79,15 +79,16 @@ export default function GiftPage() {
             "When they choose, they get a keepsake page telling the story of the name — for the baby book.",
           ],
         ].map(([t, d]) => (
-          <div key={t} className="rounded-2xl border border-line bg-card/70 p-5">
-            <div className="font-display text-lg text-plum">{t}</div>
-            <div className="mt-1 text-sm leading-relaxed text-ink-soft">{d}</div>
+          <div key={t} className="rounded-[1.25rem] border border-line bg-card/70 p-6">
+            <div className="font-display text-xl text-pewter">{t}</div>
+            <div className="mt-1.5 text-sm leading-relaxed text-ink-soft">{d}</div>
           </div>
         ))}
       </section>
 
-      <footer className="mt-16 border-t border-line pt-6 text-center text-sm text-ink-soft">
-        Made to feel like a keepsake. · Namesake
+      <footer className="mt-16 border-t border-line pt-7 text-center">
+        <DuckMark className="mx-auto h-4 w-auto text-pewter-light" />
+        <p className="mt-2.5 text-sm text-ink-soft">Namesake</p>
       </footer>
     </main>
   );

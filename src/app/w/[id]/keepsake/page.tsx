@@ -17,7 +17,7 @@ export default async function KeepsakePage(props: { params: Promise<{ id: string
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center text-ink-soft">
         <p>This keepsake isn&apos;t ready yet — a name hasn&apos;t been chosen.</p>
-        <Link href={`/w/${id}`} className="rounded-full bg-rose-deep px-5 py-2.5 text-white">
+        <Link href={`/w/${id}`} className="rounded-full bg-sage-deep px-5 py-2.5 text-white">
           Back to the journey
         </Link>
       </main>
@@ -34,19 +34,19 @@ export default async function KeepsakePage(props: { params: Promise<{ id: string
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-10">
       <div className="mb-5 flex items-center justify-between print:hidden">
-        <Link href={`/w/${id}`} className="text-sm text-ink-soft hover:text-plum">
+        <Link href={`/w/${id}`} className="text-sm text-ink-soft hover:text-pewter">
           ← Back to the journey
         </Link>
         <PrintButton />
       </div>
 
-      <article className="relative overflow-hidden rounded-[28px] border-2 border-gold/40 bg-card p-10 text-center shadow-[0_30px_80px_-40px_rgba(111,77,107,0.5)] sm:p-14">
+      <article className="relative overflow-hidden rounded-[28px] border-2 border-gold/40 bg-card p-10 text-center shadow-[0_30px_80px_-40px_rgba(65,74,69,0.5)] sm:p-14">
         <div className="pointer-events-none absolute inset-3 rounded-[22px] border border-gold/20" />
         <div className="relative">
           <div className="font-display text-sm uppercase tracking-[0.3em] text-gold">A name chosen with love</div>
 
           <div className="mt-8 text-ink-soft">We are so happy to share the name of</div>
-          <h1 className="mt-3 font-display text-5xl leading-tight text-plum sm:text-6xl">{full}</h1>
+          <h1 className="mt-3 font-display text-5xl leading-tight text-pewter sm:text-6xl">{full}</h1>
 
           <div className="mx-auto my-8 flex items-center justify-center gap-3 text-gold">
             <span className="h-px w-12 bg-gold/40" />
@@ -63,7 +63,7 @@ export default async function KeepsakePage(props: { params: Promise<{ id: string
 
           {n.meaning && (
             <p className="mt-6 text-sm text-ink-soft">
-              <span className="font-semibold text-plum">{n.firstName}</span>
+              <span className="font-semibold text-pewter">{n.firstName}</span>
               {n.origin ? ` · ${n.origin}` : ""} — {n.meaning}
             </p>
           )}
@@ -76,7 +76,7 @@ export default async function KeepsakePage(props: { params: Promise<{ id: string
           )}
 
           <div className="mt-10 text-ink-soft">
-            <div className="font-display text-xl text-plum">{parentLine}</div>
+            <div className="font-display text-xl text-pewter">{parentLine}</div>
             <div className="mt-1 text-sm">chosen {decidedOn}</div>
           </div>
         </div>

@@ -96,7 +96,7 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
   return (
     <div className="flex h-full flex-col rounded-3xl border border-line bg-card/60">
       <div className="flex items-center gap-2 border-b border-line px-5 py-3.5">
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-plum text-sm text-white">✦</span>
+        <span className="grid h-8 w-8 place-items-center rounded-full bg-pewter text-sm text-white">✦</span>
         <div>
           <div className="font-display text-lg leading-none text-ink">Your consultant</div>
           <div className="text-xs text-ink-soft">here to help, never to push</div>
@@ -118,7 +118,7 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
                   <button
                     key={s}
                     onClick={() => send(s)}
-                    className="rounded-full border border-line bg-card px-3 py-1.5 text-xs text-plum transition hover:border-rose hover:bg-blush"
+                    className="rounded-full border border-line bg-card px-3 py-1.5 text-xs text-pewter transition hover:border-sage hover:bg-butter-soft"
                   >
                     {s}
                   </button>
@@ -136,7 +136,7 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
 
         {streaming && (
           <Bubble role="assistant">
-            {live || <span className="inline-flex gap-1 text-plum"><Dot /><Dot d={0.2} /><Dot d={0.4} /></span>}
+            {live || <span className="inline-flex gap-1 text-pewter"><Dot /><Dot d={0.2} /><Dot d={0.4} /></span>}
           </Bubble>
         )}
 
@@ -150,7 +150,7 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
                   onClick={() => !isAdded && addChip(c)}
                   disabled={isAdded}
                   className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    isAdded ? "bg-sage/20 text-sage" : "border border-rose bg-blush text-rose-deep hover:bg-rose hover:text-white"
+                    isAdded ? "bg-sage/20 text-sage" : "border border-sage bg-butter-soft text-sage-deep hover:bg-sage hover:text-white"
                   }`}
                 >
                   {isAdded ? `✓ ${c} saved` : `+ Save ${c}`}
@@ -180,12 +180,12 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
                   ? "Your window has closed — everything here is still yours to read."
                   : "Say anything — this is just between us…"
               }
-              className="max-h-32 flex-1 resize-none rounded-2xl border border-line bg-paper px-4 py-3 outline-none focus:border-rose disabled:opacity-60"
+              className="max-h-32 flex-1 resize-none rounded-2xl border border-line bg-paper px-4 py-3 outline-none focus:border-sage disabled:opacity-60"
             />
             <button
               onClick={() => send(input)}
               disabled={ws.expired || streaming || !input.trim()}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-rose-deep text-white transition hover:bg-plum disabled:opacity-50"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sage-deep text-white transition hover:bg-pewter disabled:opacity-50"
               aria-label="Send"
             >
               →
@@ -207,7 +207,7 @@ function Bubble({ role, author, color, children }: { role: string; author?: stri
         )}
         <div
           className={`whitespace-pre-wrap rounded-2xl px-4 py-3 text-[15px] leading-relaxed ${
-            isUser ? "rounded-br-sm bg-plum text-white" : "rounded-bl-sm border border-line bg-card text-ink"
+            isUser ? "rounded-br-sm bg-pewter text-white" : "rounded-bl-sm border border-line bg-card text-ink"
           }`}
           style={isUser && color ? { background: color } : undefined}
         >
@@ -219,5 +219,5 @@ function Bubble({ role, author, color, children }: { role: string; author?: stri
 }
 
 function Dot({ d = 0 }: { d?: number }) {
-  return <span className="h-2 w-2 animate-bounce rounded-full bg-plum/60" style={{ animationDelay: `${d}s` }} />;
+  return <span className="h-2 w-2 animate-bounce rounded-full bg-pewter/60" style={{ animationDelay: `${d}s` }} />;
 }

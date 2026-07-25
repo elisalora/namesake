@@ -32,7 +32,7 @@ export default async function ShowerPage(props: { params: Promise<{ id: string }
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
       <header className="flex items-center justify-between print:hidden">
-        <Link href={`/w/${id}`} className="text-sm text-ink-soft hover:text-rose-deep">
+        <Link href={`/w/${id}`} className="text-sm text-ink-soft hover:text-sage-deep">
           ← Back to {ws.babyLabel}
         </Link>
         <PrintButton />
@@ -55,8 +55,8 @@ export default async function ShowerPage(props: { params: Promise<{ id: string }
         <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft print:hidden">
           The card
         </div>
-        <div className="mx-auto max-w-sm rounded-3xl border border-line bg-card p-8 text-center shadow-[0_20px_60px_-30px_rgba(111,77,107,0.4)] print:border-ink/20 print:shadow-none">
-          <div className="font-display text-xs uppercase tracking-[0.2em] text-rose-deep">
+        <div className="mx-auto max-w-sm rounded-3xl border border-line bg-card p-8 text-center shadow-[0_20px_60px_-30px_rgba(65,74,69,0.4)] print:border-ink/20 print:shadow-none">
+          <div className="font-display text-xs uppercase tracking-[0.2em] text-sage-deep">
             Help us name
           </div>
           <div className="mt-2 font-display text-3xl leading-tight text-ink">{ws.babyLabel}</div>
@@ -76,7 +76,7 @@ export default async function ShowerPage(props: { params: Promise<{ id: string }
           The table sign
         </div>
         <div className="rounded-3xl border border-line bg-card p-12 text-center print:border-ink/20">
-          <div className="font-display text-sm uppercase tracking-[0.2em] text-rose-deep">
+          <div className="font-display text-sm uppercase tracking-[0.2em] text-sage-deep">
             A name for
           </div>
           <div className="mt-3 font-display text-6xl leading-tight text-ink">{ws.babyLabel}</div>

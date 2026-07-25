@@ -24,7 +24,7 @@ export default async function WorkspacePage(props: {
   if (!member) {
     return (
       <main className="mx-auto flex max-w-lg flex-1 flex-col items-center justify-center px-6 text-center">
-        <div className="font-display text-3xl text-plum">This space is private</div>
+        <div className="font-display text-3xl text-pewter">This space is private</div>
         <p className="mt-3 text-ink-soft">
           Only the two parents can open a Namesake journey. Sign in with the email address you
           started with — or, if your partner invited you, open the link they sent.
@@ -32,13 +32,13 @@ export default async function WorkspacePage(props: {
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Link
             href="/signin"
-            className="rounded-full bg-rose-deep px-6 py-3 font-display text-white transition hover:bg-plum"
+            className="rounded-full bg-sage-deep px-6 py-3 font-display text-white transition hover:bg-pewter"
           >
             Sign in
           </Link>
           <Link
             href="/"
-            className="rounded-full border border-line px-6 py-3 font-display text-plum transition hover:border-rose"
+            className="rounded-full border border-line px-6 py-3 font-display text-pewter transition hover:border-sage"
           >
             Start a new journey
           </Link>

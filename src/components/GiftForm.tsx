@@ -94,20 +94,20 @@ export default function GiftForm({
               onClick={() => setTierId(t.id)}
               className={`relative rounded-3xl border p-6 text-left transition ${
                 selected
-                  ? "border-rose-deep bg-card shadow-[0_20px_60px_-30px_rgba(111,77,107,0.5)]"
-                  : "border-line bg-card/60 hover:border-rose"
+                  ? "border-sage-deep bg-card shadow-[0_20px_60px_-30px_rgba(65,74,69,0.5)]"
+                  : "border-line bg-card/60 hover:border-sage"
               }`}
             >
               {t.featured && (
-                <span className="absolute -top-2.5 left-6 rounded-full bg-rose-deep px-3 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white">
+                <span className="absolute -top-2.5 left-6 rounded-full bg-sage-deep px-3 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white">
                   Most given
                 </span>
               )}
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-display text-2xl text-ink">{t.name}</span>
-                <span className="font-display text-xl text-plum">{t.price}</span>
+                <span className="font-display text-xl text-pewter">{t.price}</span>
               </div>
-              <div className="mt-0.5 text-sm font-semibold text-rose-deep">{t.tagline}</div>
+              <div className="mt-0.5 text-sm font-semibold text-sage-deep">{t.tagline}</div>
               <p className="mt-3 text-sm leading-relaxed text-ink-soft">{t.blurb}</p>
 
               <div className="mt-4 border-t border-line pt-3 text-xs uppercase tracking-wide text-ink-soft">
@@ -119,7 +119,7 @@ export default function GiftForm({
                 <ul className="mt-3 space-y-1">
                   {t.boxContents.map((c) => (
                     <li key={c} className="flex gap-2 text-sm text-ink-soft">
-                      <span aria-hidden className="text-rose-deep">
+                      <span aria-hidden className="text-sage-deep">
                         ·
                       </span>
                       {c}
@@ -147,13 +147,13 @@ export default function GiftForm({
                   key={a.id}
                   onClick={() => toggleAddOn(a.id)}
                   className={`flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition ${
-                    on ? "border-rose-deep bg-card" : "border-line bg-card/60 hover:border-rose"
+                    on ? "border-sage-deep bg-card" : "border-line bg-card/60 hover:border-sage"
                   }`}
                 >
                   <span
                     aria-hidden
                     className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border text-xs ${
-                      on ? "border-rose-deep bg-rose-deep text-white" : "border-line"
+                      on ? "border-sage-deep bg-sage-deep text-white" : "border-line"
                     }`}
                   >
                     {on ? "✓" : ""}
@@ -161,7 +161,7 @@ export default function GiftForm({
                   <span className="flex-1">
                     <span className="flex items-baseline justify-between gap-2">
                       <span className="text-sm font-semibold text-ink">{a.name}</span>
-                      <span className="text-sm text-plum">+{a.price}</span>
+                      <span className="text-sm text-pewter">+{a.price}</span>
                     </span>
                     <span className="mt-0.5 block text-sm leading-relaxed text-ink-soft">
                       {a.blurb}
@@ -173,7 +173,7 @@ export default function GiftForm({
           </div>
         </section>
 
-        <section className="rounded-3xl border border-line bg-card p-7 shadow-[0_20px_60px_-30px_rgba(111,77,107,0.4)]">
+        <section className="rounded-3xl border border-line bg-card p-7 shadow-[0_20px_60px_-30px_rgba(65,74,69,0.4)]">
           <h2 className="font-display text-2xl text-ink">Send it</h2>
           <p className="mb-5 mt-1 text-sm text-ink-soft">
             {tier.physical
@@ -221,17 +221,17 @@ export default function GiftForm({
                 rows={3}
                 maxLength={500}
                 placeholder="Thinking of you both. Can't wait to meet them."
-                className="w-full resize-none rounded-xl border border-line bg-paper px-3.5 py-2.5 text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-rose focus:bg-card"
+                className="w-full resize-none rounded-xl border border-line bg-paper px-3.5 py-2.5 text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-sage focus:bg-card"
               />
             </label>
           </div>
 
-          {error && <p className="mt-3 text-sm text-rose-deep">{error}</p>}
+          {error && <p className="mt-3 text-sm text-sage-deep">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="mt-5 w-full rounded-full bg-rose-deep py-3.5 font-display text-lg text-white transition hover:bg-plum disabled:opacity-60"
+            className="mt-5 w-full rounded-full bg-sage-deep py-3.5 font-display text-lg text-white transition hover:bg-pewter disabled:opacity-60"
           >
             {loading ? "Taking you to checkout…" : `Give ${tier.name}`}
           </button>
@@ -274,7 +274,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-rose focus:bg-card"
+        className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-sage focus:bg-card"
       />
     </label>
   );

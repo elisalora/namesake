@@ -179,12 +179,12 @@ export default function RedeemPanel({
         </p>
       )}
 
-      {error && <p className="mt-3 text-sm text-rose-deep">{error}</p>}
+      {error && <p className="mt-3 text-sm text-sage-deep">{error}</p>}
 
       <button
         onClick={claim}
         disabled={busy}
-        className="mt-6 w-full rounded-full bg-rose-deep py-3.5 font-display text-lg text-white transition hover:bg-plum disabled:opacity-60"
+        className="mt-6 w-full rounded-full bg-sage-deep py-3.5 font-display text-lg text-white transition hover:bg-pewter disabled:opacity-60"
       >
         {busy ? "Opening your space…" : needsDetails ? "Open our journey" : "Begin the journey"}
       </button>
@@ -219,7 +219,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-rose focus:bg-card"
+        className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-sage focus:bg-card"
       />
     </label>
   );

@@ -28,11 +28,11 @@ export default function MarkFulfilled({ purchaseId }: { purchaseId: string }) {
 
   return (
     <span className="flex items-center gap-2">
-      {error && <span className="text-sm text-rose-deep">{error}</span>}
+      {error && <span className="text-sm text-sage-deep">{error}</span>}
       <button
         onClick={mark}
         disabled={busy}
-        className="rounded-full bg-rose-deep px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-plum disabled:opacity-60"
+        className="rounded-full bg-sage-deep px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-pewter disabled:opacity-60"
       >
         {busy ? "…" : "Mark shipped"}
       </button>

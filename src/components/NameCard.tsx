@@ -8,7 +8,7 @@ type Member = { id: string; name: string; color: string; isOwner: boolean };
 
 const CHECK_STYLE: Record<string, { dot: string; text: string; label: string }> = {
   watch: { dot: "bg-gold", text: "text-[#8a6d1f]", label: "Worth a glance" },
-  delight: { dot: "bg-rose", text: "text-rose-deep", label: "A little gift" },
+  delight: { dot: "bg-sage", text: "text-sage-deep", label: "A little gift" },
   info: { dot: "bg-sage", text: "text-ink-soft", label: "Note" },
 };
 
@@ -21,7 +21,7 @@ function Heart({ filled, onClick, interactive }: { filled: boolean; onClick?: ()
       className={`${interactive ? "cursor-pointer transition hover:scale-110" : "cursor-default"}`}
       aria-label={filled ? "filled heart" : "empty heart"}
     >
-      <svg width="20" height="20" viewBox="0 0 24 24" fill={filled ? "var(--rose)" : "none"} stroke="var(--rose)" strokeWidth="1.6">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill={filled ? "var(--sage-deep)" : "none"} stroke="var(--sage-deep)" strokeWidth="1.6">
         <path d="M12 21s-7.5-4.9-9.7-9.2C.9 8.6 2.3 5.5 5.3 5.1c1.9-.2 3.4.8 4.7 2.3 1.3-1.5 2.8-2.5 4.7-2.3 3 .4 4.4 3.5 3 6.7C19.5 16.1 12 21 12 21z" />
       </svg>
     </button>
@@ -74,7 +74,7 @@ export default function NameCard({
     const nextVeto = !myRating?.veto;
     let reason: string | null = myRating?.vetoReason ?? null;
     if (nextVeto) {
-      reason = window.prompt("A gentle veto. Want to say why? (optional)") || null;
+      reason = window.prompt("Setting this one aside. Want to say why? (optional)") || null;
     }
     await post("/api/ratings", { nameId: name.id, veto: nextVeto, vetoReason: reason });
     onChanged();
@@ -115,7 +115,7 @@ export default function NameCard({
             {name.meaning && <span>{name.meaning}</span>}
             {name.origin && <span className="text-ink-soft/70">· {name.origin}</span>}
             {name.source === "suggestion" && (
-              <span className="rounded-full bg-blush px-2 py-0.5 text-rose-deep">from your circle</span>
+              <span className="rounded-full bg-butter-soft px-2 py-0.5 text-sage-deep">from your circle</span>
             )}
             {isChosen && <span className="rounded-full bg-gold/20 px-2 py-0.5 font-semibold text-[#8a6d1f]">chosen ✦</span>}
           </div>
@@ -131,7 +131,7 @@ export default function NameCard({
       </div>
 
       {vetoedBy && (
-        <div className="mt-3 rounded-lg bg-blush px-3 py-2 text-xs text-rose-deep">
+        <div className="mt-3 rounded-lg bg-butter-soft px-3 py-2 text-xs text-sage-deep">
           Gently set aside by {vetoedBy.member}
           {vetoedBy.vetoReason ? ` — “${vetoedBy.vetoReason}”` : ""}.
         </div>
@@ -187,7 +187,7 @@ export default function NameCard({
                   />
                 ))}
               </div>
-              {r?.veto && <span className="text-[11px] text-rose-deep">vetoed</span>}
+              {r?.veto && <span className="text-[11px] text-sage-deep">vetoed</span>}
             </div>
           );
         })}
@@ -195,16 +195,16 @@ export default function NameCard({
 
       {/* Actions */}
       <div className="mt-4 flex items-center gap-3 border-t border-line pt-3 text-xs">
-        <button onClick={() => setShowComments((s) => !s)} className="text-ink-soft transition hover:text-plum">
+        <button onClick={() => setShowComments((s) => !s)} className="text-ink-soft transition hover:text-pewter">
           💬 {name.comments.length > 0 ? `${name.comments.length}` : ""} Notes
         </button>
         {!decided && (
-          <button onClick={toggleVeto} disabled={busy} className={`transition ${myRating?.veto ? "text-rose-deep" : "text-ink-soft hover:text-rose-deep"}`}>
+          <button onClick={toggleVeto} disabled={busy} className={`transition ${myRating?.veto ? "text-sage-deep" : "text-ink-soft hover:text-sage-deep"}`}>
             {myRating?.veto ? "↩ Undo veto" : "✕ Veto"}
           </button>
         )}
         {!decided && (
-          <button onClick={remove} className="ml-auto text-ink-soft/60 transition hover:text-rose-deep">
+          <button onClick={remove} className="ml-auto text-ink-soft/60 transition hover:text-sage-deep">
             Remove
           </button>
         )}
@@ -215,7 +215,7 @@ export default function NameCard({
           {name.comments.length === 0 && <p className="text-xs text-ink-soft/70">No notes yet.</p>}
           {name.comments.map((c) => (
             <div key={c.id} className="rounded-lg bg-paper-2/50 px-3 py-2 text-xs">
-              <span className="font-semibold text-plum">{c.authorName}</span>{" "}
+              <span className="font-semibold text-pewter">{c.authorName}</span>{" "}
               <span className="text-ink-soft">{c.body}</span>
             </div>
           ))}
@@ -226,9 +226,9 @@ export default function NameCard({
                 onChange={(e) => setComment(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addComment()}
                 placeholder="Add a note for your partner…"
-                className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-rose"
+                className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-xs outline-none focus:border-sage"
               />
-              <button onClick={addComment} disabled={busy} className="rounded-lg bg-plum px-3 py-2 text-xs font-semibold text-white">
+              <button onClick={addComment} disabled={busy} className="rounded-lg bg-pewter px-3 py-2 text-xs font-semibold text-white">
                 Post
               </button>
             </div>

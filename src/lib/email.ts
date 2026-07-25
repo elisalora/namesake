@@ -124,7 +124,7 @@ export function sendGiftLink(to: string, url: string, fromName: string, message?
     `${fromName} gave you a Namesake journey`,
     shell(
       `A gift from ${escapeHtml(fromName)}.`,
-      `Someone thought you might like a gentler way to choose a name. It's yours to set up however you like — six months of it.${note}`,
+      `Somewhere to choose a name together, without the whole world weighing in. It's yours to set up however you like.${note}`,
       url,
       "Open your gift",
     ),

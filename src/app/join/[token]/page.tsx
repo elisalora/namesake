@@ -38,7 +38,7 @@ export default async function JoinPage(props: { params: Promise<{ token: string 
         </p>
         <Link
           href="/signin"
-          className="mt-5 inline-block rounded-full bg-rose-deep px-6 py-3 font-display text-white transition hover:bg-plum"
+          className="mt-5 inline-block rounded-full bg-sage-deep px-6 py-3 font-display text-white transition hover:bg-pewter"
         >
           Sign in
         </Link>
@@ -69,10 +69,10 @@ export default async function JoinPage(props: { params: Promise<{ token: string 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-12">
-      <Link href="/" className="font-display text-2xl font-semibold tracking-tight text-plum">
+      <Link href="/" className="font-display text-2xl font-semibold tracking-tight text-pewter">
         Namesake
       </Link>
-      <div className="animate-rise mt-6 rounded-3xl border border-line bg-card p-7 shadow-[0_20px_60px_-30px_rgba(111,77,107,0.4)]">
+      <div className="animate-rise mt-6 rounded-3xl border border-line bg-card p-7 shadow-[0_20px_60px_-30px_rgba(65,74,69,0.4)]">
         <h1 className="mb-3 font-display text-3xl leading-tight text-ink">{title}</h1>
         {children}
       </div>

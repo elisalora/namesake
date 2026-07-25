@@ -1,24 +1,29 @@
 import type { Metadata } from "next";
-import { Fraunces, Nunito } from "next/font/google";
+import { Cormorant_Garamond, Jost } from "next/font/google";
 import "./globals.css";
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+// Cormorant for display: a high-contrast old-style serif, the lettering you'd
+// find engraved on a christening cup. It sets light, so headings use 500+ and
+// it never carries body copy.
+const cormorant = Cormorant_Garamond({
+  variable: "--font-cormorant",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600"],
   style: ["normal", "italic"],
 });
 
-const nunito = Nunito({
-  variable: "--font-nunito",
+// Jost for everything else: a geometric sans with European proportions that
+// stays out of the serif's way.
+const jost = Jost({
+  variable: "--font-jost",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600"],
 });
 
 export const metadata: Metadata = {
-  title: "Namesake — a gentle way to name your baby",
+  title: "Namesake — the naming of a child",
   description:
-    "A warm, collaborative baby-name journey for expecting parents. Talk it through, shortlist together, gather ideas from family, and end with a keepsake to remember why.",
+    "A private room where two people choose the name their child will carry — with a consultant to think it through, the people you love to draw on, and a keepsake at the end.",
 };
 
 export default function RootLayout({
@@ -27,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${nunito.variable} h-full`}>
+    <html lang="en" className={`${cormorant.variable} ${jost.variable} h-full`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

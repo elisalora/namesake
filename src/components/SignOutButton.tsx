@@ -18,7 +18,7 @@ export default function SignOutButton({ className = "" }: { className?: string }
     <button
       onClick={signOut}
       disabled={busy}
-      className={`text-sm text-ink-soft transition hover:text-rose-deep disabled:opacity-60 ${className}`}
+      className={`text-sm text-ink-soft transition hover:text-sage-deep disabled:opacity-60 ${className}`}
     >
       {busy ? "Signing out…" : "Sign out"}
     </button>
