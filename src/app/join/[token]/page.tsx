@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import EmailLinkForm from "@/components/EmailLinkForm";
+import { DEFAULT_PARTNER_NAME } from "@/lib/seat";
 
 // The shareable seat-claim link. It used to hand out access on the spot; now
 // it's an introduction, and the seat only opens once the person on the other
@@ -58,6 +59,10 @@ export default async function JoinPage(props: { params: Promise<{ token: string 
       <div className="mt-6">
         <EmailLinkForm
           seatToken={token}
+          askName
+          // Prefilled when their partner already named them; blank when the
+          // seat is still the placeholder, so they name themselves.
+          defaultName={seat.name === DEFAULT_PARTNER_NAME ? "" : seat.name}
           defaultEmail={seat.email ?? ""}
           cta="Join the journey"
         />

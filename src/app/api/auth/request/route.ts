@@ -8,6 +8,8 @@ const schema = z.object({
   email: z.string().trim().email("That doesn't look like an email address."),
   // Present when someone is claiming a seat from a shared invite link.
   seatToken: z.string().trim().min(1).optional(),
+  /// What they'd like to be called. Only meaningful alongside a seatToken.
+  name: z.string().trim().max(60).optional(),
   // Where to land afterwards. Kept to in-app paths — the redeem side validates
   // again, but there's no reason to mint a link carrying anything else.
   returnTo: z
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
   }
-  const { email, seatToken, returnTo } = parsed.data;
+  const { email, seatToken, returnTo, name } = parsed.data;
   const origin = originFrom(request);
 
   if (seatToken) {
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
       purpose: "invite",
       memberId: seat.id,
       origin,
+      name,
     });
     if (!link.ok) {
       console.warn(`[namesake] invite refused: rate limit for ${email}`);

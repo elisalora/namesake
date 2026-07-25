@@ -8,11 +8,17 @@ import { useState } from "react";
 export default function EmailLinkForm({
   seatToken,
   returnTo,
+  askName = false,
+  defaultName = "",
   defaultEmail = "",
   cta = "Email me a link",
   placeholder = "you@example.com",
 }: {
   seatToken?: string;
+  /// Ask what they'd like to be called. Used when claiming a seat, since the
+  /// name on it may be a placeholder or their partner's guess.
+  askName?: boolean;
+  defaultName?: string;
   /// Where to land after signing in — used to bring someone back to a gift.
   returnTo?: string;
   defaultEmail?: string;
@@ -20,6 +26,7 @@ export default function EmailLinkForm({
   placeholder?: string;
 }) {
   const [email, setEmail] = useState(defaultEmail);
+  const [name, setName] = useState(defaultName);
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
   const [devUrl, setDevUrl] = useState<string | null>(null);
@@ -36,7 +43,12 @@ export default function EmailLinkForm({
       const res = await fetch("/api/auth/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), seatToken, returnTo }),
+        body: JSON.stringify({
+          email: email.trim(),
+          seatToken,
+          returnTo,
+          name: askName ? name.trim() || undefined : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
@@ -54,6 +66,20 @@ export default function EmailLinkForm({
 
   return (
     <form onSubmit={submit} className="space-y-3">
+      {askName && (
+        <label className="block">
+          <span className="mb-1 flex items-baseline gap-1.5 text-sm font-semibold text-ink">
+            Your first name
+            <span className="text-xs font-normal text-ink-soft">so they know it&apos;s you</span>
+          </span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Sam"
+            className="w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-sage focus:bg-card"
+          />
+        </label>
+      )}
       <label className="block">
         <span className="mb-1 block text-sm font-semibold text-ink">Your email</span>
         <input

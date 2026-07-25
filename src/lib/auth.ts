@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
+import { DEFAULT_PARTNER_NAME } from "@/lib/seat";
 
 const SESSION_COOKIE = "ns_session";
 const LEGACY_COOKIE = "ns_member"; // pre-auth per-member token; cleared on sign-in
@@ -109,11 +110,15 @@ type IssueArgs = {
   /// Where to land after signing in — e.g. back to a gift being claimed.
   returnTo?: string;
   memberId?: string;
+  /// What the person claiming a seat calls themselves. Carried on the token
+  /// because the name is given before the link is clicked, and the seat can
+  /// only be written once they've proved the address is theirs.
+  name?: string;
 };
 
 /// Mint a single-use link. Returns the URL so the caller can mail it — and, in
 /// dev with no mail provider configured, surface it in the UI.
-export async function issueLoginLink({ email, purpose, origin, returnTo, memberId }: IssueArgs) {
+export async function issueLoginLink({ email, purpose, origin, returnTo, memberId, name }: IssueArgs) {
   const to = normalizeEmail(email);
 
   const recent = await db.loginToken.count({
@@ -129,7 +134,10 @@ export async function issueLoginLink({ email, purpose, origin, returnTo, memberI
       tokenHash: hash,
       email: to,
       purpose,
-      payload: returnTo ? JSON.stringify({ returnTo }) : null,
+      payload:
+        returnTo || name
+          ? JSON.stringify({ ...(returnTo ? { returnTo } : {}), ...(name ? { name } : {}) })
+          : null,
       memberId: memberId ?? null,
       expiresAt: new Date(Date.now() + LINK_MINUTES * 60_000),
     },
@@ -185,12 +193,16 @@ export async function redeemLoginLink(raw: string): Promise<RedeemResult> {
         return { ok: true, workspaceId: member.workspaceId };
       }
 
+      // A name given on the invite form wins: the seat may still be carrying
+      // the placeholder, or whatever their partner guessed they'd want to be
+      // called.
+      const claimedName = payloadName(token.payload) || member.name;
       await db.member.update({
         where: { id: member.id },
-        data: { userId: user.id, email: token.email },
+        data: { userId: user.id, email: token.email, name: claimedName },
       });
-      if (!user.name) {
-        await db.user.update({ where: { id: user.id }, data: { name: member.name } });
+      if (!user.name && claimedName !== DEFAULT_PARTNER_NAME) {
+        await db.user.update({ where: { id: user.id }, data: { name: claimedName } });
       }
       await createSession(user.id);
       return { ok: true, workspaceId: member.workspaceId, welcome: true };
@@ -211,6 +223,17 @@ export async function redeemLoginLink(raw: string): Promise<RedeemResult> {
       });
       return { ok: true, workspaceId: seats.length === 1 ? seats[0].workspaceId : null };
     }
+  }
+}
+
+function payloadName(payload: string | null) {
+  if (!payload) return null;
+  try {
+    const parsed = JSON.parse(payload) as { name?: unknown };
+    const v = parsed?.name;
+    return typeof v === "string" && v.trim() ? v.trim().slice(0, 60) : null;
+  } catch {
+    return null;
   }
 }
 

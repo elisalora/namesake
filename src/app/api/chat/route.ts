@@ -46,6 +46,11 @@ export async function POST(request: Request) {
     babyLabel: ws.babyLabel,
     lastName: ws.lastName,
     expecting: ws.expecting,
+    // The panel paints an opening before anyone types. It goes in the system
+    // prompt rather than the message list: a conversation has to begin with a
+    // user turn, and leading with an assistant message is rejected on some
+    // models — which broke every first message.
+    opening: openingMessage({ babyLabel: ws.babyLabel, parents: namedParents(ws.members) }),
     // Only people who are actually here. An unclaimed seat would otherwise
     // have the consultant addressing "Ada and Partner", or asking how the two
     // of them feel, to someone doing this on their own.
@@ -69,17 +74,6 @@ export async function POST(request: Request) {
     role: m.role === "assistant" ? "assistant" : "user",
     content: m.content,
   }));
-
-  // The panel paints an opening before anyone types, and it was never stored
-  // or sent — so the model had no idea it had asked anything, and a reply to
-  // that question ("we like classic names that aren't too common") arrived as
-  // a non-sequitur. Give it its own first turn.
-  if (history.length === 0) {
-    history.push({
-      role: "assistant",
-      content: openingMessage({ babyLabel: ws.babyLabel, parents: namedParents(ws.members) }),
-    });
-  }
 
   history.push({ role: "user", content: message });
 

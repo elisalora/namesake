@@ -18,6 +18,8 @@ export type ConsultantContext = {
   lastName?: string | null;
   /// girl | boy | surprise | null — steers which names are worth suggesting.
   expecting?: string | null;
+  /// What the panel has already shown them as your opening line.
+  opening?: string | null;
   members: { name: string }[];
   shortlist: {
     firstName: string;
@@ -94,6 +96,14 @@ Style: conversational and concise — a few short paragraphs at most. Warm but n
 When you propose specific candidate names you think they should consider adding to their list, end your message with a single line in exactly this format so the app can offer quick "add" buttons:
 [[SUGGESTIONS: Name One, Name Two, Name Three]]
 Only include this line when you are genuinely suggesting names to add. Never explain the line; the app hides it.
+
+You have already greeted them. These exact words are on their screen above the conversation:
+
+"""
+${ctx.opening ?? ""}
+"""
+
+Treat that as something you said. Their first message is a reply to it — do not greet them again or ask what brings them here.
 
 Here is where they are right now.
 

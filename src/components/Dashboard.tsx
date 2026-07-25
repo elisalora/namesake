@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { WorkspaceState } from "@/lib/workspace";
-import { seatLabel } from "@/lib/seat";
+import { seatLabel, DEFAULT_PARTNER_NAME } from "@/lib/seat";
+import NameYourself from "./NameYourself";
 import ChatPanel from "./ChatPanel";
 import ShortlistPanel from "./ShortlistPanel";
 import SignOutButton from "./SignOutButton";
@@ -105,6 +106,12 @@ export default function Dashboard({
           </div>
         </div>
       </header>
+
+      {/* Your own seat, still unnamed — which also means you're missing from
+          the line family and friends see. */}
+      {ws.members.some((m) => m.id === me.id && m.name === DEFAULT_PARTNER_NAME) && (
+        <NameYourself workspaceId={ws.id} onChanged={refresh} />
+      )}
 
       <WindowBanner ws={ws} />
 
