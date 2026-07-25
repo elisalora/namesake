@@ -60,6 +60,7 @@ export async function getWorkspaceState(workspaceId: string) {
     id: ws.id,
     babyLabel: ws.babyLabel,
     lastName: ws.lastName,
+    expecting: ws.expecting,
     status: ws.status,
     suggestSlug: ws.suggestSlug,
     dueDate: ws.dueDate ? ws.dueDate.toISOString() : null,

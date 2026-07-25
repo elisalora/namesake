@@ -34,6 +34,16 @@
   /* Butter — warmth, used sparingly enough that it still reads as a gift. */
   --butter: #eed489;
   --butter-soft: #faf1d7;
+
+  /*
+    Gender marks. Pink and blue by convention, but dusted down to sit beside
+    pewter and sage rather than shout over them — the nursery-pastel version of
+    these is exactly what the redesign moved away from. Yellow for either, and
+    for a surprise.
+  */
+  --mark-girl: #c08497;
+  --mark-boy: #7d93ad;
+  --mark-either: #d3a83b;
 }
 
 @theme inline {
@@ -50,6 +60,9 @@
   --color-pewter-mute: var(--pewter-mute);
   --color-butter: var(--butter);
   --color-butter-soft: var(--butter-soft);
+  --color-mark-girl: var(--mark-girl);
+  --color-mark-boy: var(--mark-boy);
+  --color-mark-either: var(--mark-either);
   --font-display: var(--font-cormorant), "Hoefler Text", Garamond, serif;
   --font-sans: var(--font-jost), ui-sans-serif, system-ui, sans-serif;
 }

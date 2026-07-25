@@ -3,6 +3,9 @@
 import { useState } from "react";
 import type { WorkspaceState } from "@/lib/workspace";
 import NameCard from "./NameCard";
+import { normalizeGender } from "./GenderMark";
+
+type GenderFilter = "all" | "girl" | "boy" | "neutral";
 
 type Me = { id: string; name: string; color: string };
 
@@ -28,8 +31,15 @@ export default function ShortlistPanel({
 
   const pending = ws.suggestions.filter((s) => s.status === "pending");
 
+  // Default the filter to what they're expecting, so someone having a girl
+  // isn't scrolling past boys' names from the first visit. "surprise" and an
+  // unanswered question both start on everything.
+  const [filter, setFilter] = useState<GenderFilter>(
+    ws.expecting === "girl" || ws.expecting === "boy" ? ws.expecting : "all",
+  );
+
   // Sort: chosen first, then by combined hearts desc, vetoed sink to bottom.
-  const names = [...ws.names].sort((a, b) => {
+  const sorted = [...ws.names].sort((a, b) => {
     if (a.status === "chosen") return -1;
     if (b.status === "chosen") return 1;
     const av = a.ratings.some((r) => r.veto) ? 1 : 0;
@@ -38,6 +48,21 @@ export default function ShortlistPanel({
     const sum = (n: typeof a) => n.ratings.reduce((t, r) => t + r.score, 0);
     return sum(b) - sum(a);
   });
+
+  // A name we've never classified stays visible under every filter — better to
+  // show a name they saved than to hide it behind a guess we never made.
+  const names = sorted.filter((n) => {
+    if (filter === "all") return true;
+    const g = normalizeGender(n.gender);
+    return g === null || g === filter || g === "neutral";
+  });
+
+  const counts = {
+    all: sorted.length,
+    girl: sorted.filter((n) => normalizeGender(n.gender) === "girl").length,
+    boy: sorted.filter((n) => normalizeGender(n.gender) === "boy").length,
+    neutral: sorted.filter((n) => normalizeGender(n.gender) === "neutral").length,
+  };
 
   async function addName(e: React.FormEvent) {
     e.preventDefault();
@@ -150,8 +175,41 @@ export default function ShortlistPanel({
         </div>
       )}
 
+      {sorted.length > 1 && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {(
+            [
+              ["all", "All"],
+              ["girl", "Girls"],
+              ["boy", "Boys"],
+              ["neutral", "Either"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                filter === key
+                  ? "border-sage-deep bg-sage-deep text-white"
+                  : "border-line bg-card text-ink-soft hover:border-sage"
+              }`}
+            >
+              {label}
+              <span className={filter === key ? "ml-1.5 opacity-70" : "ml-1.5 text-ink-soft/60"}>
+                {counts[key]}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex-1 space-y-3">
-        {names.length === 0 && (
+        {sorted.length > 0 && names.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-line bg-card/50 p-8 text-center text-ink-soft">
+            <p className="text-sm">Nothing on your list leans that way yet.</p>
+          </div>
+        )}
+        {sorted.length === 0 && (
           <div className="rounded-2xl border border-dashed border-line bg-card/50 p-8 text-center text-ink-soft">
             <p className="font-display text-lg text-pewter">No names yet</p>
             <p className="mt-1 text-sm">

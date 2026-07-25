@@ -43,6 +43,7 @@ export async function POST(request: Request) {
   const ctx: ConsultantContext = {
     babyLabel: ws.babyLabel,
     lastName: ws.lastName,
+    expecting: ws.expecting,
     // Only people who are actually here. An unclaimed seat would otherwise
     // have the consultant addressing "Ada and Partner", or asking how the two
     // of them feel, to someone doing this on their own.

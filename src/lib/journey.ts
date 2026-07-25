@@ -21,6 +21,9 @@ const PALETTE = ["#7d8f76", "#a98a4f"];
 export const journeyDraft = z.object({
   babyLabel: z.string().trim().max(60).optional(),
   lastName: z.string().trim().max(60).optional(),
+  /// "surprise" is a real answer — it means they know they don't want to know,
+  /// which is different from never having been asked.
+  expecting: z.enum(["girl", "boy", "surprise"]).optional(),
   dueDate: z.string().optional(),
   you: z.object({
     name: z.string().trim().min(1).max(60),
@@ -60,6 +63,7 @@ export async function createJourney(
     data: {
       babyLabel: draft.babyLabel?.trim() || "Baby",
       lastName: draft.lastName?.trim() || null,
+      expecting: draft.expecting ?? null,
       dueDate: draft.dueDate ? new Date(draft.dueDate) : null,
       expiresAt: opts.expiresAt ?? null,
       suggestSlug: opts.suggestSlug || slugId(),

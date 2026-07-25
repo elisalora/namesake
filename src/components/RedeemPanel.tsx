@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ExpectingChoice, { type Expecting } from "./ExpectingChoice";
 
 type Props = {
   code: string;
@@ -38,6 +39,7 @@ export default function RedeemPanel({
     lastName: "",
     dueDate: "",
   });
+  const [expecting, setExpecting] = useState<Expecting | "">("");
 
   function set<K extends keyof typeof form>(k: K, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -78,6 +80,7 @@ export default function RedeemPanel({
                 babyLabel: form.babyLabel.trim(),
                 lastName: form.lastName.trim(),
                 dueDate: form.dueDate || undefined,
+                expecting: expecting || undefined,
               }
             : undefined,
         }),
@@ -92,7 +95,7 @@ export default function RedeemPanel({
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setBusy(false);
     }
-  }, [code, form, needsDetails, router, signedInAs]);
+  }, [code, form, expecting, needsDetails, router, signedInAs]);
 
   if (waiting) {
     return (
@@ -173,6 +176,7 @@ export default function RedeemPanel({
               today — you can always add more time later.
             </p>
           )}
+          <ExpectingChoice value={expecting} onChange={setExpecting} />
         </div>
       ) : (
         <p className="mt-3 text-sm leading-relaxed text-ink-soft">

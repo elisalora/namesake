@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { NameState } from "@/lib/workspace";
+import GenderMark from "./GenderMark";
 
 type Me = { id: string; name: string; color: string };
 type Member = { id: string; name: string; color: string; isOwner: boolean; joined: boolean };
@@ -112,6 +113,7 @@ export default function NameCard({
             {full}
           </h3>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
+            <GenderMark gender={name.gender} />
             {name.meaning && <span>{name.meaning}</span>}
             {name.origin && <span className="text-ink-soft/70">· {name.origin}</span>}
             {name.source === "suggestion" && (

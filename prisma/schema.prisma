@@ -145,6 +145,9 @@ model Workspace {
   id            String    @id @default(cuid())
   babyLabel     String    @default("Baby") // e.g. "Baby Alora" or "Peanut"
   lastName      String? // family surname, used for initials + flow checks
+  /// girl | boy | surprise | null. Steers the consultant and the default
+  /// shortlist filter. "surprise" is a real answer, not a missing one.
+  expecting     String?
   dueDate       DateTime?
   status        String    @default("active") // active | decided | archived
   expiresAt     DateTime? // end of the paid window; null = grandfathered, no expiry

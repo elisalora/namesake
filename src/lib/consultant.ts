@@ -16,6 +16,8 @@ export function hasApiKey(): boolean {
 export type ConsultantContext = {
   babyLabel: string;
   lastName?: string | null;
+  /// girl | boy | surprise | null — steers which names are worth suggesting.
+  expecting?: string | null;
   members: { name: string }[];
   shortlist: {
     firstName: string;
@@ -37,6 +39,15 @@ export function buildSystemPrompt(ctx: ConsultantContext): string {
         : "the parents";
 
   const surname = ctx.lastName ? ` The family surname is ${ctx.lastName}.` : "";
+
+  const expecting =
+    ctx.expecting === "girl"
+      ? " They are expecting a girl — suggest girls' names, and names that work for a girl, unless they ask otherwise."
+      : ctx.expecting === "boy"
+        ? " They are expecting a boy — suggest boys' names, and names that work for a boy, unless they ask otherwise."
+        : ctx.expecting === "surprise"
+          ? " They have chosen not to find out the sex. Favour names that work either way, and do not ask them what they are having — they have decided, and asking again is a small unkindness."
+          : "";
 
   const shortlist =
     ctx.shortlist.length > 0
@@ -62,7 +73,7 @@ export function buildSystemPrompt(ctx: ConsultantContext): string {
           .join("\n")
       : "(none yet)";
 
-  return `You are the consultant inside Namesake — a warm, wise, unhurried companion helping ${parentLine} choose a name for ${ctx.babyLabel}.${surname}
+  return `You are the consultant inside Namesake — a warm, wise, unhurried companion helping ${parentLine} choose a name for ${ctx.babyLabel}.${surname}${expecting}
 
 Choosing a baby's name is emotional and high-stakes, and the people you're talking to may feel overwhelmed or pulled in different directions by family and expectation. Your whole purpose is to make this feel joyful, collaborative, and low-pressure — to help them arrive at a name they genuinely love and feel at peace with.
 

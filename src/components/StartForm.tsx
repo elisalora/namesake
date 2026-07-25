@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ExpectingChoice, { type Expecting } from "./ExpectingChoice";
 
 export default function StartForm({ priceLabel }: { priceLabel: string }) {
   const [loading, setLoading] = useState(false);
@@ -13,6 +14,7 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
     babyLabel: "",
     lastName: "",
   });
+  const [expecting, setExpecting] = useState<Expecting | "">("");
 
   function set<K extends keyof typeof form>(k: K, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -42,6 +44,7 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
             partner: { name: form.partner.trim(), email: form.partnerEmail.trim() },
             babyLabel: form.babyLabel.trim(),
             lastName: form.lastName.trim(),
+            expecting: expecting || undefined,
           },
         }),
       });
@@ -101,6 +104,8 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
           placeholder="Peanut"
         />
       </div>
+
+      <ExpectingChoice value={expecting} onChange={setExpecting} />
 
       {error && <p className="text-sm text-sage-deep">{error}</p>}
 
