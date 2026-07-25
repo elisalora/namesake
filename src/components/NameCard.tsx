@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { NameState } from "@/lib/workspace";
-import GenderMark from "./GenderMark";
+import GenderMark, { nextGender } from "./GenderMark";
 
 type Me = { id: string; name: string; color: string };
 type Member = { id: string; name: string; color: string; isOwner: boolean; joined: boolean };
@@ -91,6 +91,15 @@ export default function NameCard({
     setBusy(false);
   }
 
+  // Enrichment can fail, disagree, or never have run — a suggestion arrives
+  // untagged and would otherwise sit outside every filter forever.
+  async function cycleGender() {
+    setBusy(true);
+    await post(`/api/names/${name.id}`, { gender: nextGender(name.gender) }, "PATCH");
+    onChanged();
+    setBusy(false);
+  }
+
   async function remove() {
     if (!window.confirm(`Remove ${name.firstName} from your list?`)) return;
     await post(`/api/names/${name.id}`, {}, "DELETE");
@@ -113,7 +122,7 @@ export default function NameCard({
             {full}
           </h3>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
-            <GenderMark gender={name.gender} />
+            <GenderMark gender={name.gender} onCycle={decided ? undefined : cycleGender} />
             {name.meaning && <span>{name.meaning}</span>}
             {name.origin && <span className="text-ink-soft/70">· {name.origin}</span>}
             {name.source === "suggestion" && (

@@ -142,7 +142,13 @@ export async function enrichName(
       gender,
     };
   } catch (err) {
-    console.error("enrichName failed", err);
+    // Silent enrichment failure is why a name can sit untagged forever, and
+    // the cause is usually the configured model rather than the name.
+    const e = err as { status?: number; message?: string };
+    console.error(
+      `[namesake] enrichName failed for "${firstName}" ` +
+        `(model=${ENRICH_MODEL}, status=${e?.status ?? "none"}): ${e?.message ?? String(err)}`,
+    );
     return null;
   }
 }
