@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { parentLine as buildParentLine } from "@/lib/seat";
 import PrintButton from "@/components/PrintButton";
 
 export default async function KeepsakePage(props: { params: Promise<{ id: string }> }) {
@@ -26,8 +27,9 @@ export default async function KeepsakePage(props: { params: Promise<{ id: string
 
   const n = ws.chosenName;
   const full = [n.firstName, n.middleName, n.lastName ?? ws.lastName].filter(Boolean).join(" ");
-  const parents = ws.members.map((m) => m.name).filter(Boolean);
-  const parentLine = parents.length === 2 ? `${parents[0]} & ${parents[1]}` : parents[0] || "";
+  // The keepsake is the thing they keep. "& Partner" printed on it forever
+  // would be the worst place for a placeholder to survive.
+  const parentLine = buildParentLine(ws.members);
   const contributors = Array.from(new Set(ws.suggestions.map((s) => s.suggesterName).filter(Boolean)));
   const decidedOn = ws.updatedAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 

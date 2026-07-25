@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { namedParents, parentLine as buildParentLine } from "@/lib/seat";
 import SuggestForm from "@/components/SuggestForm";
 
 export default async function SuggestPage(props: { params: Promise<{ slug: string }> }) {
@@ -37,8 +38,12 @@ export default async function SuggestPage(props: { params: Promise<{ slug: strin
     );
   }
 
-  const parents = ws.members.map((m) => m.name).filter(Boolean);
-  const parentLine = parents.length === 2 ? `${parents[0]} & ${parents[1]}` : parents[0] || "the parents";
+  // Only people who've actually been named — an unclaimed seat would put
+  // "& Partner" in front of everyone the couple invited.
+  const parentLine = buildParentLine(ws.members, "the parents");
+  // "Mia have already found" needs a singular verb. Elsewhere singular "they"
+  // does the work, which also avoids guessing anything about who they are.
+  const solo = namedParents(ws.members).length === 1;
 
   if (ws.status === "decided") {
     return (
@@ -46,8 +51,8 @@ export default async function SuggestPage(props: { params: Promise<{ slug: strin
         <div className="mb-3 text-3xl">✦</div>
         <h1 className="font-display text-3xl text-pewter">They&apos;ve chosen a name!</h1>
         <p className="mt-3 text-ink-soft">
-          {parentLine} have already found the name for {ws.babyLabel}. Thank you so much for being
-          part of it.
+          {parentLine} {solo ? "has" : "have"} already found the name for {ws.babyLabel}. Thank you
+          so much for being part of it.
         </p>
       </main>
     );
@@ -63,8 +68,8 @@ export default async function SuggestPage(props: { params: Promise<{ slug: strin
           Help {parentLine} name <span className="italic text-sage-deep">{ws.babyLabel}</span>
         </h1>
         <p className="mt-3 text-ink-soft">
-          They&apos;d love your ideas. Suggest a name you adore — a family name, one with a story,
-          anything that feels right. Your note goes straight to them.
+          They&apos;d love your ideas. Suggest a name you adore — a family name, one with a
+          story, anything that feels right. Your note goes straight to them.
         </p>
       </header>
       <SuggestForm slug={slug} babyLabel={ws.babyLabel} />
