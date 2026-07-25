@@ -95,6 +95,10 @@ model Purchase {
   draft          String? // JSON journey draft, for `journey` purchases
 
   redeemCode  String  @unique // unguessable; the redeem link is the bearer token
+  /// Reserved at purchase rather than at redemption, so the shower card can be
+  /// printed and boxed before the journey it points at exists. Carried onto the
+  /// workspace when the grant is redeemed.
+  suggestSlug String? @unique
   workspaceId String? // extend: set at purchase. journey/gift: set on redeem.
 
   stripeSessionId String? @unique // also the idempotency key for fulfillment

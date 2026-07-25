@@ -117,7 +117,7 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
         <a href="/refunds" className="underline underline-offset-2 hover:text-sage-deep">
           refundable
         </a>{" "}
-        until you open it.
+        for fourteen days.
       </p>
     </form>
   );

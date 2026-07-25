@@ -245,7 +245,7 @@ export default function GiftForm({
             <a href="/refunds" className="underline underline-offset-2 hover:text-sage-deep">
               refundable
             </a>{" "}
-            for as long as it stays unopened.
+            for fourteen days.
           </p>
         </section>
       </div>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { NameState } from "@/lib/workspace";
 
 type Me = { id: string; name: string; color: string };
-type Member = { id: string; name: string; color: string; isOwner: boolean };
+type Member = { id: string; name: string; color: string; isOwner: boolean; joined: boolean };
 
 const CHECK_STYLE: Record<string, { dot: string; text: string; label: string }> = {
   watch: { dot: "bg-gold", text: "text-[#8a6d1f]", label: "Worth a glance" },
@@ -162,9 +162,14 @@ export default function NameCard({
         </ul>
       )}
 
-      {/* Ratings — one row per parent */}
+      {/* Ratings — one row per parent who is actually here.
+          A seat nobody has claimed isn't a person yet, and showing it as an
+          empty row of hearts on every name tells someone doing this alone,
+          over and over, that they're a half of something. */}
       <div className="mt-4 space-y-2">
-        {members.map((m) => {
+        {members
+          .filter((m) => m.joined || m.id === me.id)
+          .map((m) => {
           const r = name.ratings.find((x) => x.memberId === m.id);
           const mine = m.id === me.id;
           return (

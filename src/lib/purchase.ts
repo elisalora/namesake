@@ -2,7 +2,12 @@ import { randomBytes } from "node:crypto";
 import type Stripe from "stripe";
 import { db } from "@/lib/db";
 import { normalizeEmail } from "@/lib/auth";
-import { createJourney, journeyDraft, type JourneyDraft } from "@/lib/journey";
+import {
+  createJourney,
+  journeyDraft,
+  reserveSuggestSlug,
+  type JourneyDraft,
+} from "@/lib/journey";
 import {
   TIERS,
   EXTEND,
@@ -127,6 +132,9 @@ export async function createPurchase(input: NewGiftOrJourney) {
       draft: input.draft ? JSON.stringify(input.draft) : null,
       needsShipping,
       redeemCode: redeemCode(),
+      // Reserved now so a shower card can be printed and packed before the
+      // journey exists to point at.
+      suggestSlug: reserveSuggestSlug(),
       items: { create: items },
     },
     include: { items: true },
@@ -369,6 +377,7 @@ export async function redeemPurchase(
       const { workspace, partner } = await createJourney(parsed.data, ownerUserId, {
         expiresAt,
         client: tx,
+        suggestSlug: purchase.suggestSlug,
       });
       await tx.purchase.update({
         where: { id: purchase.id },

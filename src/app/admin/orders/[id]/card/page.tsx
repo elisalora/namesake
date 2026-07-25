@@ -28,9 +28,18 @@ export default async function GiftCardPage(props: { params: Promise<{ id: string
     configured || `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host") ?? "localhost:3000"}`;
 
   const redeemUrl = `${origin}/redeem/${purchase.redeemCode}`;
-  const qr = await qrSvg(redeemUrl);
   const tier = TIERS[purchase.tier as TierId];
   const shortUrl = redeemUrl.replace(/^https?:\/\//, "");
+
+  // The suggestion slug is reserved at purchase, so this card can be printed
+  // now even though the journey it points at doesn't exist yet. Anyone who
+  // scans early is told to come back rather than shown a dead link.
+  const suggestUrl = purchase.suggestSlug ? `${origin}/s/${purchase.suggestSlug}` : null;
+
+  const [qr, showerQr] = await Promise.all([
+    qrSvg(redeemUrl),
+    suggestUrl ? qrSvg(suggestUrl) : Promise.resolve(null),
+  ]);
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-10">
@@ -93,9 +102,33 @@ export default async function GiftCardPage(props: { params: Promise<{ id: string
         </div>
       </section>
 
-      <p className="mt-8 text-center text-xs text-ink-soft print:hidden">
-        Print at actual size. The link works once — if this card is reprinted or replaced, it is
-        still the same link.
+      {/* The second card: the one that goes on the gift table. */}
+      {showerQr && (
+        <section className="mt-12 break-before-page break-inside-avoid">
+          <div className="mb-2 engraved print:hidden">The shower card</div>
+          <div className="mx-auto max-w-md rounded-[1.5rem] border border-line bg-card px-10 py-12 text-center shadow-[0_28px_70px_-40px_rgba(65,74,69,0.45)] print:border-ink/20 print:shadow-none">
+            <p className="engraved">Help us choose</p>
+            <p className="mt-4 font-display text-3xl leading-snug text-ink">
+              Leave us a name you love
+            </p>
+            <div
+              className="mx-auto mt-7 w-40 [&>svg]:h-auto [&>svg]:w-full"
+              dangerouslySetInnerHTML={{ __html: showerQr }}
+            />
+            <p className="mt-6 text-sm leading-relaxed text-ink-soft">
+              Scan and tell us the name — and the story behind it. That&apos;s the part
+              we&apos;ll keep.
+            </p>
+            <p className="mt-3 break-all text-[11px] leading-relaxed text-pewter-light">
+              {suggestUrl?.replace(/^https?:\/\//, "")}
+            </p>
+          </div>
+        </section>
+      )}
+
+      <p className="mt-8 text-center text-xs leading-relaxed text-ink-soft print:hidden">
+        Print at actual size — two cards, one per page. The shower card works from the moment
+        they open their gift; anyone who scans it before then is told to come back.
       </p>
     </main>
   );

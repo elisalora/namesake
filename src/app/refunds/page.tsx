@@ -4,7 +4,7 @@ import DuckMark, { OrnamentRule } from "@/components/DuckMark";
 export const metadata = {
   title: "Namesake — refunds",
   description:
-    "Refundable in full any time before a journey is opened, including a gift that was never claimed. Fourteen days once it has been.",
+    "Fourteen days from purchase, for any reason. Boxes refundable until posted; personalised keepsakes until they're made.",
 };
 
 const SUPPORT = process.env.NAMESAKE_SUPPORT_EMAIL || "hello@namesake.alora.tech";
@@ -36,28 +36,20 @@ export default function RefundsPage() {
           If it isn&apos;t <span className="italic text-sage-deep">right, say so.</span>
         </h1>
         <p className="mt-7 max-w-xl text-lg leading-relaxed text-ink-soft">
-          The short version: nothing you haven&apos;t used is ever kept. A gift that was never
-          opened is refundable for as long as it stays unopened — there&apos;s no clock on it.
+          The short version: fourteen days from the day you bought it, for any reason at all.
+          No form, no phone call, and nobody asking you to reconsider.
         </p>
       </section>
 
       <div className="space-y-11 pb-8">
-        <Clause q="Before a journey is opened">
+        <Clause q="Fourteen days, whatever the reason">
           <p>
-            Full refund, any time, no time limit and no reason needed. This covers the case that
-            actually comes up: a gift bought for someone who already had a name chosen, or who
-            never got round to opening it.
+            Full refund within fourteen days of purchase. You don&apos;t need to have a reason,
+            and you don&apos;t need to explain the one you have.
           </p>
           <p>
             The money goes back to whoever paid — so for a gift, that&apos;s you, not the person
             you bought it for.
-          </p>
-        </Clause>
-
-        <Clause q="Once it's been opened">
-          <p>
-            Fourteen days from the day it was opened, for any reason. Tell us and it&apos;s done;
-            we won&apos;t ask you to justify it or offer you three alternatives first.
           </p>
           <p>
             After fourteen days the journey is yours for the window you bought. If something has
@@ -68,8 +60,8 @@ export default function RefundsPage() {
         <Clause q="Boxes">
           <p>
             Refundable in full until the box is posted. Once it&apos;s on its way we can&apos;t
-            recall it, but the journey inside it still follows the rules above — if it hasn&apos;t
-            been opened, that part is still refundable.
+            recall it, but the journey inside it still follows the rule above — within fourteen
+            days, that part is refundable whether or not the box has gone.
           </p>
         </Clause>
 

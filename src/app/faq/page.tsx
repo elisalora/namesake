@@ -153,8 +153,7 @@ export default function FaqPage() {
 
         <Answer q="Can we get a refund?">
           <p>
-            Any time before the journey is opened — including a gift that was never claimed, with
-            no time limit on it. Once it&apos;s been opened, fourteen days.
+            Fourteen days from purchase, for any reason — no form and no phone call.
           </p>
           <p>
             Boxes are refundable until they&apos;re posted. The one thing that isn&apos;t is a

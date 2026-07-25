@@ -71,7 +71,11 @@ How you show up:
 - You ask gentle, opening questions: the feeling they want the name to carry, family or heritage that matters, sounds and styles they're drawn to, names they've already loved or ruled out, sibling names, how it sits with the surname.
 - You suggest names sparingly and with a reason — the meaning, origin, the feeling, or why it suits what they've told you. A few well-chosen names beat a long list. Never dump twenty names.
 - You gently surface practical things worth a glance — unfortunate initials, teasing potential, spelling or pronunciation burden, extreme trendiness — but always kindly, always framed as "worth a thought," never as a verdict. The parents decide. You never veto.
-- You hold space for two people who may disagree. If one parent has vetoed a name, honor it gracefully and help them find something you both can love. Celebrate overlap when you see it.
+${
+  parents.length > 1
+    ? "- You hold space for two people who may disagree. If one parent has vetoed a name, honor it gracefully and help them find something they can both love. Celebrate overlap when you see it."
+    : "- Right now you are talking with one person, and you must not assume there is a second. Do not ask what their partner thinks, refer to \"the two of you\", or imply anyone else should be consulted. Someone may be doing this alone by choice or by circumstance, and either way this is their decision to make. If they mention a partner themselves, follow their lead."
+}
 - You actively relax social pressure. Reassure them that it's their choice, that no name is perfect, that they're allowed to change their minds, and that the "right" name is the one that feels like theirs.
 
 Style: conversational and concise — a few short paragraphs at most. Warm but not saccharine. Write in plain text like a text message — NO markdown, no asterisks, no bold, no headers, no bullet-point avalanches. When you mention a specific name in the flow of a sentence, just write it plainly (Willow, not **Willow**). Speak to them as a couple.
@@ -130,6 +134,17 @@ export async function* streamConsultant(
   history: ChatTurn[],
 ): AsyncGenerator<string> {
   if (!hasApiKey()) {
+    // In development, stand-in replies make the whole product explorable
+    // without a key. In production they'd be canned text dressed up as the
+    // thing someone paid for, which is worse than saying nothing — so be
+    // honest to them and loud to us.
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[namesake] chat requested but ANTHROPIC_API_KEY is not set — the consultant is offline",
+      );
+      yield "I'm not able to answer just now — something on our side needs attention. Nothing you've written is lost, and the shortlist still works. Do try again shortly.";
+      return;
+    }
     yield mockReply(ctx, history);
     return;
   }
@@ -152,15 +167,16 @@ export async function* streamConsultant(
   }
 }
 
-// A graceful, human stand-in when no API key is configured, so the whole
-// experience is explorable before wiring in the live model.
+// A stand-in for local development only, so the product is explorable without
+// a key.
+//
+// It must never return the opening greeting: the chat panel already shows one
+// before anyone types, and `history` always contains at least the message just
+// sent — so a greeting here reads as the consultant ignoring you and repeating
+// itself, which is exactly what it used to do.
 function mockReply(ctx: ConsultantContext, history: ChatTurn[]): string {
   const last = history[history.length - 1]?.content?.toLowerCase() ?? "";
-  const parents = ctx.members.map((m) => m.name).filter(Boolean).join(" & ") || "you two";
 
-  if (history.length <= 1) {
-    return `Congratulations — this is such a lovely thing to be doing together. I'm so glad ${parents} are here.\n\nThere's no rush and no wrong answers. To start, tell me a little about the feeling you want ${ctx.babyLabel}'s name to carry — something classic and rooted, something soft and unusual, a name that honors family? And are there any names either of you already find yourselves drawn to?\n\n(I'm running in preview mode right now — add an Anthropic API key and I'll come fully to life.)`;
-  }
   if (last.includes("family") || last.includes("grandma") || last.includes("heritage")) {
     return `Honoring family is one of the most meaningful ways in — a name can carry a whole story forward. Tell me the names on each side that mean something to you, and whether you'd want to use one outright or just borrow its sound or spirit. Sometimes a beloved grandmother's name lives best as a middle name.\n\n[[SUGGESTIONS: Eleanor, Rose, August]]`;
   }

@@ -6,6 +6,12 @@ import { DEFAULT_PARTNER_NAME } from "@/lib/seat";
 
 const slugId = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 10);
 
+/// Reserve the public suggestion slug before there's a journey to attach it
+/// to, so a card carrying it can be printed and boxed at purchase time.
+export function reserveSuggestSlug() {
+  return slugId();
+}
+
 // Avatar tints — sage and antique brass, so the two of you are told apart at a
 // glance without either colour fighting the rest of the page.
 const PALETTE = ["#7d8f76", "#a98a4f"];
@@ -41,7 +47,13 @@ export type JourneyDraft = z.infer<typeof journeyDraft>;
 export async function createJourney(
   draft: JourneyDraft,
   ownerUserId: string,
-  opts: { expiresAt?: Date | null; client?: Prisma.TransactionClient } = {},
+  opts: {
+    expiresAt?: Date | null;
+    client?: Prisma.TransactionClient;
+    /// Reserved on the purchase so the shower card could be printed before
+    /// this journey existed. Use it, or the card in the box points nowhere.
+    suggestSlug?: string | null;
+  } = {},
 ) {
   const client = opts.client ?? db;
   const workspace = await client.workspace.create({
@@ -50,7 +62,7 @@ export async function createJourney(
       lastName: draft.lastName?.trim() || null,
       dueDate: draft.dueDate ? new Date(draft.dueDate) : null,
       expiresAt: opts.expiresAt ?? null,
-      suggestSlug: slugId(),
+      suggestSlug: opts.suggestSlug || slugId(),
       members: {
         create: [
           {

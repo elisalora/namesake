@@ -70,7 +70,9 @@ export default function Dashboard({
           </div>
           <div className="flex items-center gap-2">
             <div className="flex -space-x-1.5">
-              {ws.members.map((m) => (
+              {ws.members
+                .filter((m) => m.joined)
+                .map((m) => (
                 <span
                   key={m.id}
                   title={m.name}

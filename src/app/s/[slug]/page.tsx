@@ -10,9 +10,29 @@ export default async function SuggestPage(props: { params: Promise<{ slug: strin
   });
 
   if (!ws) {
+    // The slug is reserved when a gift is bought, so a card can be printed and
+    // boxed before the journey exists. Someone scanning it at a shower before
+    // the couple has opened their gift should be told to come back, not shown
+    // a dead end — the link will start working the moment they do.
+    const reserved = await db.purchase.findUnique({
+      where: { suggestSlug: slug },
+      select: { id: true },
+    });
+
     return (
-      <main className="flex flex-1 items-center justify-center px-6 text-center text-ink-soft">
-        This suggestion link doesn&apos;t seem to exist.
+      <main className="mx-auto flex max-w-lg flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+        {reserved ? (
+          <>
+            <div className="mb-3 text-3xl">✦</div>
+            <h1 className="font-display text-3xl text-pewter">Not quite yet</h1>
+            <p className="mt-3 leading-relaxed text-ink-soft">
+              This is the right link — the parents just haven&apos;t opened their gift yet. Try
+              again once they have, and your suggestion will be waiting for them.
+            </p>
+          </>
+        ) : (
+          <p className="text-ink-soft">This suggestion link doesn&apos;t seem to exist.</p>
+        )}
       </main>
     );
   }

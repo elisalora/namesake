@@ -78,10 +78,10 @@ export const TIERS: Record<TierId, Tier> = {
     currency: "usd",
     window: { rule: "months", months: 3 },
     physical: true,
-    // One card, not two. The shower card can't be printed at packing time —
-    // its QR points at a suggestion link that doesn't exist until the couple
-    // has opened the journey. They print that one themselves, from inside.
-    boxContents: ["A card in your own words, carrying the link that opens it"],
+    boxContents: [
+      "A card in your own words, carrying the link that opens it",
+      "A second card for the gift table, so the room can suggest names",
+    ],
     featured: true,
   },
   whole_journey: {
@@ -97,10 +97,10 @@ export const TIERS: Record<TierId, Tier> = {
     // would rather not say.
     window: { rule: "due_date_grace", graceDays: 7, fallbackMonths: 9 },
     physical: true,
-    // One card, not two. The shower card can't be printed at packing time —
-    // its QR points at a suggestion link that doesn't exist until the couple
-    // has opened the journey. They print that one themselves, from inside.
-    boxContents: ["A card in your own words, carrying the link that opens it"],
+    boxContents: [
+      "A card in your own words, carrying the link that opens it",
+      "A second card for the gift table, so the room can suggest names",
+    ],
   },
   self_serve: {
     id: "self_serve",
