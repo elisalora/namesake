@@ -6,7 +6,7 @@ import { GIFT_TIERS, ADD_ONS, formatPrice, describeWindow } from "@/lib/pricing"
 export const metadata = {
   title: "Give a Namesake journey",
   description:
-    "A gift for expecting parents: a calm, collaborative way to choose a name, in a box you can hand over at the shower — and a keepsake at the end.",
+    "A gift for expecting parents: the way to choose their child's name. A private room for the two of them, a card the whole shower can scan, and the story of the name at the end.",
 };
 
 // The gifter's storefront. A different person from the one who uses it, so
@@ -51,15 +51,37 @@ export default function GiftPage() {
       <section className="animate-rise py-14 text-center">
         <p className="engraved">A gift for expecting parents</p>
         <h1 className="mx-auto mt-5 max-w-3xl font-display text-6xl leading-[1.02] text-ink sm:text-7xl">
-          Everyone has an opinion.
+          A name is the first thing
           <br />
-          <span className="italic text-sage-deep">Give them somewhere to put it.</span>
+          they&apos;ll <span className="italic text-sage-deep">give their child.</span>
         </h1>
         <p className="mx-auto mt-7 max-w-xl text-lg leading-relaxed text-ink-soft">
-          The two of them get a private room and someone thoughtful to think it through with.
-          Everyone else gets a card to scan. You get to be the one who gave it.
+          You&apos;re giving them the choosing of it — a private room for the two of them,
+          someone thoughtful to think it through with, and the story of the name at the end.
         </p>
-        <OrnamentRule className="mx-auto mt-10 max-w-xs" />
+
+        {/* The question a gifter actually has, answered before the prices. */}
+        <ol className="mx-auto mt-12 grid max-w-3xl gap-8 text-left sm:grid-cols-3">
+          {[
+            ["You choose", "Pick how long it lasts and write them a note. We'll ask where to post it."],
+            [
+              "You hand it over",
+              "The box comes to you, so you can give it in person. Or send it straight to their inbox.",
+            ],
+            [
+              "They open it",
+              "They scan the card, set up their room, and start choosing the name.",
+            ],
+          ].map(([t, d], i) => (
+            <li key={t}>
+              <span className="engraved">{`0${i + 1}`}</span>
+              <div className="mt-1.5 font-display text-2xl text-pewter">{t}</div>
+              <div className="mt-1 text-sm leading-relaxed text-ink-soft">{d}</div>
+            </li>
+          ))}
+        </ol>
+
+        <OrnamentRule className="mx-auto mt-14 max-w-xs" />
       </section>
 
       <GiftForm tiers={tiers} addOns={addOns} />
@@ -67,16 +89,16 @@ export default function GiftPage() {
       <section className="mt-16 grid gap-4 sm:grid-cols-3">
         {[
           [
-            "You get a little say",
-            "Your note goes on the card, and you can put a name forward yourself — without being the relative who pushes.",
+            "Your voice, on the card",
+            "Your note is the first thing they read — and you can put a name forward yourself, without being the relative who pushes.",
           ],
           [
-            "They get the room",
-            "Every tier includes the shower QR: guests scan, suggest a name, and say why. No opinions ambushing them over cake.",
+            "Somewhere for everyone else",
+            "Guests scan a card and leave a name with the reason behind it, instead of offering opinions over cake.",
           ],
           [
-            "It ends with something",
-            "When they choose, they get a keepsake page telling the story of the name — for the baby book.",
+            "Something at the end",
+            "When they settle on a name, they get a page telling the story of how they chose it. For the baby book.",
           ],
         ].map(([t, d]) => (
           <div key={t} className="rounded-[1.25rem] border border-line bg-card/70 p-6">

@@ -59,9 +59,9 @@ export const TIERS: Record<TierId, Tier> = {
     id: "sprout",
     kind: "gift",
     name: "Sprout",
-    tagline: "A month together",
+    tagline: "A month to choose",
     blurb:
-      "The whole experience for a month — enough to find the name, and small enough to go in on with others.",
+      "The whole thing, for a month. Enough to land on the name — and small enough that several of you can go in on it.",
     amountCents: cents("NAMESAKE_PRICE_SPROUT_CENTS", 5900),
     currency: "usd",
     window: { rule: "months", months: 1 },
@@ -71,17 +71,16 @@ export const TIERS: Record<TierId, Tier> = {
     id: "bloom",
     kind: "gift",
     name: "Bloom",
-    tagline: "The one you hand over",
+    tagline: "Three months, in a box",
     blurb:
-      "Three months, arriving in a box you can put in their hands at the shower — with a card in your own words and the QR that brings the whole room in.",
+      "The same thing, three months of it, arriving as something you can put in their hands at the shower.",
     amountCents: cents("NAMESAKE_PRICE_BLOOM_CENTS", 10900),
     currency: "usd",
     window: { rule: "months", months: 3 },
     physical: true,
     boxContents: [
-      "A wooden rattle",
-      "A keepsake card carrying your note",
-      "The shower QR, for gathering everyone's suggestions",
+      "A card in your own words, carrying their link",
+      "A second card for the gift table, so the room can suggest names",
     ],
     featured: true,
   },
@@ -89,9 +88,9 @@ export const TIERS: Record<TierId, Tier> = {
     id: "whole_journey",
     kind: "gift",
     name: "The Whole Journey",
-    tagline: "All the way to the due date",
+    tagline: "Until the baby arrives",
     blurb:
-      "Everything in Bloom, lasting the rest of the pregnancy — plus a week's grace, because babies keep their own schedules.",
+      "The same box, lasting the rest of the pregnancy and a week past the due date — because babies keep their own schedules.",
     amountCents: cents("NAMESAKE_PRICE_WHOLE_JOURNEY_CENTS", 15900),
     currency: "usd",
     // Resolved when they redeem and tell us the due date; nine months if they
@@ -99,9 +98,8 @@ export const TIERS: Record<TierId, Tier> = {
     window: { rule: "due_date_grace", graceDays: 7, fallbackMonths: 9 },
     physical: true,
     boxContents: [
-      "A wooden rattle",
-      "A keepsake card carrying your note",
-      "The shower QR, for gathering everyone's suggestions",
+      "A card in your own words, carrying their link",
+      "A second card for the gift table, so the room can suggest names",
     ],
   },
   self_serve: {
@@ -110,7 +108,7 @@ export const TIERS: Record<TierId, Tier> = {
     name: "A journey of your own",
     tagline: "For the two of you",
     blurb:
-      "Three months of the consultant, your shortlist, ideas from the people you love, and the keepsake at the end.",
+      "Three months with the consultant, your shortlist, ideas from the people you love, and the keepsake at the end.",
     amountCents: cents("NAMESAKE_PRICE_SELF_SERVE_CENTS", 4900),
     currency: "usd",
     window: { rule: "months", months: 3 },
@@ -133,8 +131,8 @@ export const EXTEND = {
 export const ADD_ONS: Record<AddOnId, AddOn> = {
   rattle: {
     id: "rattle",
-    name: "Monogrammed rattle",
-    blurb: "Upgrades the rattle in the box to one engraved with the initial they choose.",
+    name: "Engraved rattle",
+    blurb: "Pewter, engraved with their initial once the name is settled.",
     amountCents: cents("NAMESAKE_PRICE_RATTLE_CENTS", 2800),
     physical: true,
     shipsAfterNaming: true,
@@ -142,15 +140,15 @@ export const ADD_ONS: Record<AddOnId, AddOn> = {
   blanket: {
     id: "blanket",
     name: "Embroidered blanket",
-    blurb: "Soft cotton, embroidered with the name once it's chosen.",
+    blurb: "Soft cotton, embroidered with the name they choose.",
     amountCents: cents("NAMESAKE_PRICE_BLANKET_CENTS", 5800),
     physical: true,
     shipsAfterNaming: true,
   },
   framed_print: {
     id: "framed_print",
-    name: "Framed keepsake print",
-    blurb: "Their keepsake page — the name and the story behind it — printed and framed.",
+    name: "Framed keepsake",
+    blurb: "The name and the story behind it, printed and framed.",
     amountCents: cents("NAMESAKE_PRICE_FRAMED_PRINT_CENTS", 3000),
     physical: true,
     shipsAfterNaming: true,

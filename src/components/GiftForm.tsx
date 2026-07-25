@@ -116,16 +116,19 @@ export default function GiftForm({
               </div>
 
               {t.boxContents.length > 0 && (
-                <ul className="mt-3 space-y-1">
-                  {t.boxContents.map((c) => (
-                    <li key={c} className="flex gap-2 text-sm text-ink-soft">
-                      <span aria-hidden className="text-sage-deep">
-                        ·
-                      </span>
-                      {c}
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <p className="engraved mt-4">In the box</p>
+                  <ul className="mt-2 space-y-1.5">
+                    {t.boxContents.map((c) => (
+                      <li key={c} className="flex gap-2 text-sm leading-relaxed text-ink-soft">
+                        <span aria-hidden className="text-sage-deep">
+                          ·
+                        </span>
+                        {c}
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </button>
           );
@@ -134,9 +137,10 @@ export default function GiftForm({
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_0.9fr]">
         <section>
-          <h2 className="font-display text-2xl text-ink">Make it a complete gift</h2>
-          <p className="mb-4 mt-1 text-sm text-ink-soft">
-            Optional keepsakes, made once the name is chosen and sent on to them.
+          <h2 className="font-display text-2xl text-ink">Add a keepsake</h2>
+          <p className="mb-4 mt-1 text-sm leading-relaxed text-ink-soft">
+            Optional, and made to order — each one waits until they&apos;ve settled on the name,
+            then goes to them directly.
           </p>
           <div className="space-y-2">
             {addOns.map((a) => {
@@ -175,10 +179,10 @@ export default function GiftForm({
 
         <section className="rounded-3xl border border-line bg-card p-7 shadow-[0_20px_60px_-30px_rgba(65,74,69,0.4)]">
           <h2 className="font-display text-2xl text-ink">Send it</h2>
-          <p className="mb-5 mt-1 text-sm text-ink-soft">
+          <p className="mb-5 mt-1 text-sm leading-relaxed text-ink-soft">
             {tier.physical
-              ? "We'll post the box to you, so you can hand it over yourself."
-              : "We'll email it straight to them."}
+              ? "The box comes to you, so you can give it in person. Add their email and they can start before it arrives."
+              : "This one goes straight to their inbox."}
           </p>
 
           <div className="space-y-4">
@@ -201,7 +205,7 @@ export default function GiftForm({
 
             <Field
               label="Their email"
-              hint={tier.physical ? "optional — the card carries their link" : undefined}
+              hint={tier.physical ? "optional — the card carries it too" : undefined}
               type="email"
               value={form.recipientEmail}
               onChange={(v) => set("recipientEmail", v)}

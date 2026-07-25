@@ -101,7 +101,7 @@ anchored on Bloom — the boxed tier meant to be handed over at a shower.
 | *One week past due?* | a member | +1 month | — | $19 |
 
 Add-ons ride along on any gift and are made once there's a name to put on them:
-monogrammed rattle $28, embroidered blanket $58, framed keepsake print $30.
+engraved rattle $28, embroidered blanket $58, framed keepsake $30.
 Every price is env-overridable — see `.env.example`.
 
 **The Whole Journey's window can't be known when it's bought.** A gifter rarely knows the
