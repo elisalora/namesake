@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { WorkspaceState } from "@/lib/workspace";
 import { seatLabel, DEFAULT_PARTNER_NAME } from "@/lib/seat";
 import NameYourself from "./NameYourself";
+import JourneyDetails from "./JourneyDetails";
 import ChatPanel from "./ChatPanel";
 import ShortlistPanel from "./ShortlistPanel";
 import SignOutButton from "./SignOutButton";
@@ -28,6 +29,7 @@ export default function Dashboard({
   const [ws, setWs] = useState(initial);
   const [welcome, setWelcome] = useState(showWelcome);
   const [share, setShare] = useState(false);
+  const [details, setDetails] = useState(false);
   const [decideOpen, setDecideOpen] = useState<string | null>(null); // preselected nameId
   const [mobileTab, setMobileTab] = useState<"chat" | "list">("chat");
   const [reveal, setReveal] = useState(false);
@@ -68,11 +70,16 @@ export default function Dashboard({
           <Link href="/" className="font-display text-xl font-semibold text-pewter">
             Namesake
           </Link>
-          <div className="hidden items-center gap-2 text-sm text-ink-soft sm:flex">
+          <button
+            onClick={() => setDetails(true)}
+            title="Edit these details"
+            className="hidden items-center gap-2 rounded-full px-2 py-1 text-sm text-ink-soft transition hover:bg-card sm:flex"
+          >
             <span>Naming</span>
             <span className="font-display text-base text-ink">{ws.babyLabel}</span>
             {ws.lastName && <span>· {ws.lastName}</span>}
-          </div>
+            <span aria-hidden className="text-xs text-pewter-light">✎</span>
+          </button>
           <div className="flex items-center gap-2">
             <div className="flex -space-x-1.5">
               {ws.members
@@ -134,6 +141,12 @@ export default function Dashboard({
             </button>
           ))}
         </div>
+        <button
+          onClick={() => setDetails(true)}
+          className="mt-2 w-full text-center text-xs text-ink-soft underline underline-offset-2"
+        >
+          Edit {ws.babyLabel}&apos;s details
+        </button>
       </div>
 
       <main className="mx-auto grid w-full max-w-7xl flex-1 gap-5 px-5 py-4 lg:grid-cols-2 lg:py-5">
@@ -154,6 +167,15 @@ export default function Dashboard({
       )}
       {share && (
         <ShareModal ws={ws} inviteUrl={inviteUrl} familyUrl={familyUrl} onClose={() => setShare(false)} />
+      )}
+      {details && (
+        <Modal onClose={() => setDetails(false)}>
+          <h2 className="font-display text-2xl text-ink">The details</h2>
+          <p className="mb-5 mt-1 text-sm text-ink-soft">
+            Everything here was optional at the start. Fill in what you know now.
+          </p>
+          <JourneyDetails ws={ws} onSaved={setWs} onClose={() => setDetails(false)} />
+        </Modal>
       )}
       {decideOpen !== null && (
         <DecideModal

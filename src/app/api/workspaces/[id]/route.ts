@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { db } from "@/lib/db";
 import { getWorkspaceState } from "@/lib/workspace";
-import { getMemberForWorkspace } from "@/lib/session";
+import { getMemberForWorkspace, getWritableMember, writeDenied } from "@/lib/session";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -11,4 +13,57 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (!state) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   return NextResponse.json({ workspace: state, me: { id: member.id, name: member.name, color: member.color } });
+}
+
+// All of this was asked for once, at the start, when some of it wasn't known
+// yet — a surname not yet settled, a nickname that hadn't stuck. An empty
+// string clears a field rather than being ignored, so a wrong answer can be
+// taken back and not merely replaced.
+const patchSchema = z.object({
+  babyLabel: z.string().trim().max(60).optional(),
+  lastName: z.string().trim().max(60).optional(),
+  dueDate: z.string().trim().optional(),
+  expecting: z.enum(["girl", "boy", "surprise"]).nullable().optional(),
+});
+
+export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+
+  const access = await getWritableMember(id);
+  if (!access.ok) return writeDenied(access);
+
+  const parsed = patchSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Please check those details." }, { status: 400 });
+  }
+  const { babyLabel, lastName, dueDate, expecting } = parsed.data;
+
+  let due: Date | null | undefined;
+  if (dueDate !== undefined) {
+    if (dueDate === "") {
+      due = null;
+    } else {
+      const d = new Date(dueDate);
+      if (Number.isNaN(d.getTime())) {
+        return NextResponse.json({ error: "That date didn't look right." }, { status: 400 });
+      }
+      due = d;
+    }
+  }
+
+  await db.workspace.update({
+    where: { id },
+    data: {
+      // A blank label would leave the journey nameless everywhere it appears.
+      ...(babyLabel !== undefined ? { babyLabel: babyLabel || "Baby" } : {}),
+      ...(lastName !== undefined ? { lastName: lastName || null } : {}),
+      ...(due !== undefined ? { dueDate: due } : {}),
+      ...(expecting !== undefined ? { expecting } : {}),
+    },
+  });
+
+  // Deliberately not touching expiresAt. The window was bought and paid for;
+  // correcting a due date afterwards shouldn't quietly lengthen or shorten it.
+  const state = await getWorkspaceState(id);
+  return NextResponse.json({ ok: true, workspace: state });
 }
