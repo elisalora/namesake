@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- The house mark, redrawn for a tab strip.
+
+       Three departures from DuckMark, each forced by size rather than taste:
+
+       It carries its own sage ground instead of inheriting currentColor,
+       because a tab strip may be light or dark and an unfilled line mark
+       vanishes into one of them.
+
+       The line is about twice its drawn weight. At 16px a hairline falls under
+       one device pixel and the whole duck greys into a smudge.
+
+       The tail flick is gone and the bill is solid. Both are fine at emblem
+       size and both fail at this one — boldened, the flick reads as a blob
+       floating off the tail, and the bill's two strokes close up into a nub.
+       Losing the flick costs less than keeping a smudge. -->
+  <rect width="64" height="64" rx="14" fill="#55654f" />
+  <g transform="translate(2.44 12.53) scale(0.86)"
+     fill="none" stroke="#fdfcf7" stroke-width="3.6"
+     stroke-linecap="round" stroke-linejoin="round">
+    <!-- Breast, body and tail in one line, as it would be engraved. -->
+    <path d="M45.2 22.2c-2.6 1.5-5.8 2.2-9.4 2.2H22.6c-7.9 0-14.3 4.3-14.3 9.6 0 3.4 3.1 5.6 7.7 5.6h19.4c9.6 0 17.2-6.2 17.2-13.8" />
+    <!-- Bill, drawn before the head so its root tucks behind. Blunt, not
+         pointed — tapered to a spike it reads as an arrow. -->
+    <path d="M50 10.9 L61 12.8 L61 15.6 L50 17.3 Z" fill="#fdfcf7" stroke="#fdfcf7" stroke-width="1.8" />
+    <!-- Filled with the ground so the body line and bill root pass behind it. -->
+    <circle cx="45" cy="14" r="8.3" fill="#55654f" />
+    <circle cx="47.3" cy="12.1" r="1.4" fill="#fdfcf7" stroke="none" />
+  </g>
+</svg>
