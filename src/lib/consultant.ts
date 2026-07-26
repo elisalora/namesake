@@ -36,6 +36,16 @@ function isModelUnavailable(err: unknown): boolean {
   return e?.status === 400 && /model/i.test(e?.message ?? "");
 }
 
+/// The key itself is wrong, not permitted, or out of credit. No model on the
+/// ladder can survive this — they all authenticate the same way — so trying
+/// them in turn just multiplies the delay in front of an apology that is
+/// coming regardless. Give up immediately and say so loudly.
+function isCredentialProblem(err: unknown): boolean {
+  const e = err as { status?: number; message?: string };
+  if (e?.status === 401 || e?.status === 403) return true;
+  return e?.status === 400 && /credit balance|billing|quota/i.test(e?.message ?? "");
+}
+
 /// Busy, rate-limited, or briefly broken. The same model will likely work in a
 /// moment, so this is worth waiting for rather than falling down the ladder.
 function isTransient(err: unknown): boolean {
@@ -311,6 +321,17 @@ export async function* streamConsultant(
       } catch (err) {
         if (spoke) throw err;
         lastError = err;
+
+        if (isCredentialProblem(err)) {
+          const e = err as { status?: number; message?: string };
+          console.error(
+            `[namesake] consultant cannot authenticate (status=${e?.status ?? "none"}): ${e?.message ?? String(err)}\n` +
+              `           ANTHROPIC_API_KEY is set but not accepted. No fallback can help — every model uses the same key.\n` +
+              `           Reissue it at console.anthropic.com, update it in Vercel for Production, and redeploy ` +
+              `(environment changes only take effect on a new deploy).`,
+          );
+          throw err;
+        }
 
         if (isTransient(err) && attempt < 2) {
           await sleep(400 * 2 ** attempt);
