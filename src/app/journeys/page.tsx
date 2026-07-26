@@ -23,8 +23,8 @@ export default async function JourneysPage() {
         </Link>
         <div className="flex items-center gap-4">
           {admin && (
-            <Link href="/admin/codes" className="text-sm font-semibold text-ink-soft hover:text-sage-deep">
-              Free codes
+            <Link href="/admin" className="text-sm font-semibold text-ink-soft hover:text-sage-deep">
+              Admin
             </Link>
           )}
           <SignOutButton />
