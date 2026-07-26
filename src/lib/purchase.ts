@@ -151,6 +151,10 @@ export async function createCompGift(input: {
   fromName?: string;
   message?: string;
   months?: number;
+  /// Optional. Given one, the caller mails the link straight to them; without
+  /// one the code is yours to hand over however you like, which is what makes
+  /// this work for a text message or a card as readily as an inbox.
+  recipientEmail?: string;
 }) {
   const months = input.months && input.months > 0 ? input.months : 6;
   return db.purchase.create({
@@ -165,6 +169,7 @@ export async function createCompGift(input: {
       currency: "usd",
       purchaserEmail: normalizeEmail(input.createdByEmail),
       purchaserName: input.fromName?.trim() || "Someone who loves you",
+      recipientEmail: input.recipientEmail ? normalizeEmail(input.recipientEmail) : null,
       giftMessage: input.message?.trim() || null,
       // The whole point: granted the moment it's made, so redemption is all
       // that's left.

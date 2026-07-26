@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, getJourneysForUser } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin";
 import SignOutButton from "@/components/SignOutButton";
 
 // Where you land when you're signed in but we don't know which journey you
@@ -12,13 +13,22 @@ export default async function JourneysPage() {
   const journeys = await getJourneysForUser(user.id);
   if (journeys.length === 1) redirect(`/w/${journeys[0].workspaceId}`);
 
+  const admin = await requireAdmin();
+
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 py-12">
       <header className="flex items-center justify-between">
         <Link href="/" className="font-display text-2xl font-semibold tracking-tight text-pewter">
           Namesake
         </Link>
-        <SignOutButton />
+        <div className="flex items-center gap-4">
+          {admin && (
+            <Link href="/admin/codes" className="text-sm font-semibold text-ink-soft hover:text-sage-deep">
+              Free codes
+            </Link>
+          )}
+          <SignOutButton />
+        </div>
       </header>
 
       {journeys.length === 0 ? (

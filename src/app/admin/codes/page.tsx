@@ -24,6 +24,7 @@ export default async function CodesPage() {
     babyLabel: p.workspace?.babyLabel ?? null,
     fromName: p.purchaserName,
     message: p.giftMessage,
+    recipientEmail: p.recipientEmail,
   }));
 
   return (

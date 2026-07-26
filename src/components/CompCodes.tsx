@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Code = {
@@ -10,14 +10,25 @@ type Code = {
   babyLabel: string | null;
   fromName: string | null;
   message: string | null;
+  recipientEmail: string | null;
 };
 
+/// What became of the invitation email, when there was an address to send to.
+type Minted = {
+  url: string;
+  mailed: "sent" | "console" | "failed" | null;
+  recipientEmail: string | null;
+};
+
+/// `url` may be absolute (as the mint endpoint returns it) or a bare path (as
+/// the server-rendered list has it, which can't know the origin). Resolving at
+/// click time covers both without the component needing to be told which.
 function CopyLink({ url, label }: { url: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
       onClick={() => {
-        navigator.clipboard.writeText(url);
+        navigator.clipboard.writeText(new URL(url, window.location.origin).toString());
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
@@ -30,15 +41,13 @@ function CopyLink({ url, label }: { url: string; label?: string }) {
 
 export default function CompCodes({ codes }: { codes: Code[] }) {
   const router = useRouter();
-  const [origin, setOrigin] = useState("");
   const [fromName, setFromName] = useState("");
   const [message, setMessage] = useState("");
   const [months, setMonths] = useState(6);
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [busy, setBusy] = useState(false);
-  const [minted, setMinted] = useState<string | null>(null);
+  const [minted, setMinted] = useState<Minted | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => setOrigin(window.location.origin), []);
 
   async function mint() {
     setBusy(true);
@@ -52,11 +61,13 @@ export default function CompCodes({ codes }: { codes: Code[] }) {
           fromName: fromName.trim() || undefined,
           message: message.trim() || undefined,
           months,
+          recipientEmail: recipientEmail.trim() || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
-      setMinted(data.url);
+      setMinted({ url: data.url, mailed: data.mailed ?? null, recipientEmail: data.recipientEmail });
+      setRecipientEmail("");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -73,7 +84,24 @@ export default function CompCodes({ codes }: { codes: Code[] }) {
           and start. The keepsake add-ons are still theirs to buy at the end.
         </p>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <label className="mt-4 block">
+          <span className="mb-1 flex items-baseline gap-1.5 text-xs font-semibold text-ink-soft">
+            Send it to
+            <span className="font-normal">
+              optional — leave it blank and you&apos;ll get a link to pass on yourself
+            </span>
+          </span>
+          <input
+            type="email"
+            value={recipientEmail}
+            onChange={(e) => setRecipientEmail(e.target.value)}
+            placeholder="friend@example.com"
+            autoComplete="off"
+            className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-sage"
+          />
+        </label>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <label className="block">
             <span className="mb-1 block text-xs font-semibold text-ink-soft">From (optional)</span>
             <input
@@ -112,13 +140,39 @@ export default function CompCodes({ codes }: { codes: Code[] }) {
           disabled={busy}
           className="mt-4 rounded-full bg-sage-deep px-6 py-2.5 font-semibold text-white transition hover:bg-pewter disabled:opacity-60"
         >
-          {busy ? "Making it…" : "Generate a code"}
+          {busy ? "Making it…" : recipientEmail.trim() ? "Generate and send it" : "Generate a code"}
         </button>
 
         {minted && (
-          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-sage/50 bg-butter-soft/50 p-3">
-            <span className="flex-1 truncate text-sm text-ink">{minted}</span>
-            <CopyLink url={minted} label="Copy the link" />
+          <div className="mt-4 rounded-xl border border-sage/50 bg-butter-soft/50 p-3">
+            {minted.mailed && (
+              <p className="mb-2 text-sm text-ink">
+                {minted.mailed === "sent" && (
+                  <>
+                    Sent to <strong>{minted.recipientEmail}</strong>. Here&apos;s your own copy of the
+                    link:
+                  </>
+                )}
+                {/* No mail provider locally — the email went to the server log
+                    instead, so the link below is the only way to hand it over. */}
+                {minted.mailed === "console" && (
+                  <>
+                    The code is ready, but there&apos;s no mail provider configured here, so nothing
+                    was actually emailed to {minted.recipientEmail}. Send them this link:
+                  </>
+                )}
+                {minted.mailed === "failed" && (
+                  <>
+                    The code is ready, but the email to {minted.recipientEmail} didn&apos;t go
+                    through. Send them this link instead:
+                  </>
+                )}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="flex-1 truncate text-sm text-ink">{minted.url}</span>
+              <CopyLink url={minted.url} label="Copy the link" />
+            </div>
           </div>
         )}
       </div>
@@ -145,11 +199,14 @@ export default function CompCodes({ codes }: { codes: Code[] }) {
                   {c.redeemed && c.babyLabel && (
                     <span className="text-sm text-ink">Naming {c.babyLabel}</span>
                   )}
+                  {c.recipientEmail && (
+                    <span className="truncate text-sm text-ink-soft">→ {c.recipientEmail}</span>
+                  )}
                   <span className="text-xs text-ink-soft">{c.created.slice(0, 10)}</span>
                 </div>
                 {c.message && <div className="mt-1 truncate text-xs italic text-ink-soft">“{c.message}”</div>}
               </div>
-              {!c.redeemed && origin && <CopyLink url={`${origin}/redeem/${c.code}`} />}
+              {!c.redeemed && <CopyLink url={`/redeem/${c.code}`} />}
             </li>
           ))}
         </ul>
