@@ -1,3 +1,8 @@
+// Same reason as prisma.config.ts, which already does this: the guard below
+// reads DATABASE_URL itself, before Prisma gets a chance to load .env, so
+// without this `npm run build` fails locally on a variable that is in fact set.
+// On Vercel there's no .env and the real values come from the environment.
+import "dotenv/config";
 import { execFileSync } from "node:child_process";
 
 // Apply migrations before the build.

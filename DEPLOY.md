@@ -9,6 +9,15 @@ Do it in this order — each step produces something the next one needs.
 
 ## 1. A database
 
+> ✅ **Already done.** A Neon database exists at `ep-sweet-sound-a6rfnfz6.us-west-2.aws.neon.tech`,
+> and its schema is current — all 5 migrations applied, checked 2026-07-25. Both connection
+> strings are in `.env.neon.local` (gitignored). You only need to copy them into Vercel in
+> step 5; skip the rest of this section.
+>
+> ⚠️ **One naming trap.** `.env.neon.local` calls the unpooled string `DIRECT_URL`, but the
+> build reads it as **`MIGRATE_DATABASE_URL`**. Copy the *value*, not the name, or migrations
+> will run over the pooler and can hang on an advisory lock.
+
 Anything that speaks Postgres works. Two easy options:
 
 - **[Prisma Postgres](https://console.prisma.io)** — same people as the ORM, has a free tier
@@ -110,7 +119,13 @@ Set these in Vercel under **Settings → Environment Variables**. Mark them for 
 | `STRIPE_SECRET_KEY` | `sk_test_…` from step 3 | to demo buying |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from step 6 | with Stripe |
 | `ANTHROPIC_API_KEY` | your key | no — falls back to mock replies |
-| `NAMESAKE_ADMIN_EMAILS` | your email | to see `/admin/orders` |
+| `NAMESAKE_ADMIN_EMAILS` | your email | to reach `/admin/orders` and `/admin/codes` |
+
+**The build checks these for you.** `scripts/preflight.mjs` runs first and, on Vercel,
+*refuses the build* for settings that would leave the site broken in ways that look fine
+from the outside — a missing `RESEND_API_KEY`, or a Stripe key with no webhook secret.
+Everything else it warns about and continues. Run `npm run preflight` locally any time to
+see where you stand.
 
 `NAMESAKE_URL` matters more than it looks: it's what every magic link, gift link and
 shower QR is built from. Get it wrong and the QR on a printed card points somewhere dead.
@@ -148,13 +163,50 @@ Walk the whole loop once as a stranger would:
 
 ---
 
+## 8. Letting friends in for free
+
+Steps 3 and 6 are only about *selling*. To hand the whole experience to a friend for
+nothing — no card, real or fake — use **`/admin/codes`**.
+
+1. Sign in with an address listed in `NAMESAKE_ADMIN_EMAILS`.
+2. Go to `https://namesake.alora.tech/admin/codes`. (There's also a **Free codes** link in
+   the header of `/journeys` when you're an admin.)
+3. Optionally fill in **Send it to** with their email, a note, and how many months of
+   access. Leave the email blank and you get a link to pass on however you like — a text
+   message, a card, in person.
+4. Press **Generate**. If you gave an address, they get the gift email; either way the link
+   comes back for you to copy.
+
+They open the link, sign in with **their own** email, describe the baby they're naming, and
+start. The code is single-use, so a link that's already been opened can't be reused.
+
+> **A comp is a `Purchase` that's born already paid**, so it never touches Stripe — which
+> is why this works with no payment configuration at all. It grants the journey only; the
+> keepsake add-ons still sit at full price at the end, which is useful if you want honest
+> feedback on whether people would actually buy them.
+>
+> The page tells you whether the email really went out. If it says it didn't, send the
+> link by hand — the code is valid regardless.
+
+---
+
 ## Things worth knowing
 
 **It's a public URL.** Anyone who finds it can create a journey. In Stripe test mode that
 costs nobody anything, but don't switch to live keys until you actually want to sell.
 
-**Test data isn't real data.** The local `dev.db` from development isn't carried over, and
-the migration history was rebuilt for Postgres. Production starts empty, which is right.
+**The Neon database is not empty.** As of 2026-07-25 it holds 3 users, 2 workspaces and 4
+purchases left over from earlier testing — nothing from your local Postgres is carried
+over, but Neon itself was already used. None of it is real. Wipe it if you'd rather start
+clean before showing anyone; leave it if you don't mind, since it costs nothing.
+
+**Two pages are reachable without signing in, by design.** `/s/<slug>` (family suggestions)
+and `/w/<id>/keepsake` (the finished keepsake) have no session check — that's the point of
+both: the shower QR has to work for guests, and a keepsake you can't send to a grandparent
+isn't a keepsake. Neither is enumerable, since the slug and the workspace id are random,
+but anyone *holding* a keepsake URL can read the chosen name and the parents' names without
+being a member. Worth knowing before you paste one into a group chat. The dashboard itself
+(`/w/<id>`) is properly gated by `getMemberForWorkspace()`.
 
 **Journeys expire.** Anything you create for a demo runs out on its tier's schedule. If a
 demo journey goes read-only mid-conversation, that's the paywall working — extend it, or
