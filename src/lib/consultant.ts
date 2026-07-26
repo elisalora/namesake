@@ -8,8 +8,52 @@ import Anthropic from "@anthropic-ai/sdk";
 const CHAT_MODEL = process.env.NAMESAKE_MODEL || "claude-sonnet-5";
 const ENRICH_MODEL = process.env.NAMESAKE_ENRICH_MODEL || "claude-haiku-4-5";
 
+// The consultant is the product, so it is not allowed to depend on one name
+// being right. A model id is a string in an environment variable, set once and
+// then left alone while models come and go — and a retired or mistyped one
+// fails with a 404 on the very first token, which reads to a parent as the
+// consultant being dead. That is exactly how it broke.
+//
+// So the configured model is a preference, not a requirement. If it can't be
+// reached we walk down this list until something answers. They are ordered
+// cheapest-adequate first: the reply should still sound like the consultant
+// even when the ladder has been walked all the way down.
+const CHAT_FALLBACKS = ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5"];
+
+// Once a model has answered, remember it for the life of the process so a
+// misconfigured id costs one wasted round trip rather than one per message.
+let preferredModel: string | null = null;
+
+function chatModels(): string[] {
+  return [...new Set([preferredModel, CHAT_MODEL, ...CHAT_FALLBACKS].filter(Boolean) as string[])];
+}
+
+/// A model that can't be reached at all: retired, mistyped, or not enabled for
+/// this key. Trying it again is pointless; the next model might work.
+function isModelUnavailable(err: unknown): boolean {
+  const e = err as { status?: number; message?: string };
+  if (e?.status === 404) return true;
+  return e?.status === 400 && /model/i.test(e?.message ?? "");
+}
+
+/// Busy, rate-limited, or briefly broken. The same model will likely work in a
+/// moment, so this is worth waiting for rather than falling down the ladder.
+function isTransient(err: unknown): boolean {
+  const s = (err as { status?: number })?.status;
+  return s === 408 || s === 429 || s === 500 || s === 502 || s === 503 || s === 529;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export function hasApiKey(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
+}
+
+/// What the consultant is currently configured to do. Read by the health
+/// check, so a misconfiguration can be seen from outside without going and
+/// finding the server logs.
+export function consultantConfig() {
+  return { hasKey: hasApiKey(), configured: CHAT_MODEL, ladder: chatModels(), proven: preferredModel };
 }
 
 // Context the consultant is given about this couple's journey.
@@ -225,21 +269,76 @@ export async function* streamConsultant(
   }
 
   const client = new Anthropic();
-  const stream = client.messages.stream({
-    model: CHAT_MODEL,
-    max_tokens: 1200,
-    system: buildSystemPrompt(ctx),
-    messages: history.map((t) => ({ role: t.role, content: t.content })),
-  });
+  const system = buildSystemPrompt(ctx);
+  const messages = sendableHistory(history);
+  let lastError: unknown = null;
 
-  for await (const event of stream) {
-    if (
-      event.type === "content_block_delta" &&
-      event.delta.type === "text_delta"
-    ) {
-      yield event.delta.text;
+  for (const model of chatModels()) {
+    for (let attempt = 0; ; attempt++) {
+      // Whether this attempt has put words on the parent's screen. Once it
+      // has, no other model may take over: restarting would splice two
+      // half-answers together mid-sentence, which is worse than the apology.
+      let spoke = false;
+      try {
+        const stream = client.messages.stream({
+          model,
+          // Room for the reply *and* for thinking, which the model may do
+          // before writing. Sized tight, a thoughtful turn spends the budget
+          // reasoning and streams nothing — a silent failure that looks
+          // identical to a broken consultant.
+          max_tokens: 2400,
+          system,
+          messages,
+        });
+
+        for await (const event of stream) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            spoke = true;
+            yield event.delta.text;
+          }
+        }
+
+        if (preferredModel !== model) {
+          preferredModel = model;
+          if (model !== CHAT_MODEL) {
+            console.warn(
+              `[namesake] consultant fell back to ${model}; NAMESAKE_MODEL is "${CHAT_MODEL}", ` +
+                `which this key could not reach. Fix the environment variable — this is a warning, not a plan.`,
+            );
+          }
+        }
+        return;
+      } catch (err) {
+        if (spoke) throw err;
+        lastError = err;
+
+        if (isTransient(err) && attempt < 2) {
+          await sleep(400 * 2 ** attempt);
+          continue;
+        }
+        const e = err as { status?: number; message?: string };
+        console.error(
+          `[namesake] consultant model ${model} failed (status=${e?.status ?? "none"}): ${e?.message ?? String(err)}`,
+        );
+        break;
+      }
     }
   }
+
+  // Every model on the ladder refused. The route turns this into an apology.
+  throw lastError ?? new Error("no consultant model could be reached");
+}
+
+/// Trim the conversation to what is worth sending.
+///
+/// Empty turns are dropped: a turn that streamed nothing used to be saved as
+/// an empty message, and while the API tolerates those, they cost tokens and
+/// render as blank bubbles. The last turn is always the parent's new message,
+/// which is validated non-empty upstream, so this can never empty the list.
+function sendableHistory(history: ChatTurn[]): { role: "user" | "assistant"; content: string }[] {
+  return history
+    .filter((t) => t.content && t.content.trim().length > 0)
+    .map((t) => ({ role: t.role, content: t.content }));
 }
 
 // A stand-in for local development only, so the product is explorable without

@@ -54,7 +54,11 @@ export async function POST(request: Request) {
         take: 25,
       },
       suggestions: { where: { status: "pending" }, orderBy: { createdAt: "desc" }, take: 10 },
-      messages: { orderBy: { createdAt: "asc" }, take: 40 },
+      // The *most recent* forty turns. Ascending order took the oldest forty
+      // instead, so a long journey kept sending the model its opening
+      // small-talk and none of the last hour — the consultant appeared to
+      // forget everything the moment a couple really got going.
+      messages: { orderBy: { createdAt: "desc" }, take: 40 },
     },
   });
   if (!ws) return new Response("not_found", { status: 404 });
@@ -125,10 +129,14 @@ export async function POST(request: Request) {
     })),
   };
 
-  const history: ChatTurn[] = ws.messages.map((m) => ({
-    role: m.role === "assistant" ? "assistant" : "user",
-    content: m.content,
-  }));
+  // Back into the order they were said in — the query fetched them newest
+  // first to get the right end of a long conversation.
+  const history: ChatTurn[] = [...ws.messages]
+    .reverse()
+    .map((m) => ({
+      role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+      content: m.content,
+    }));
 
   history.push({ role: "user", content: message });
 
@@ -164,10 +172,17 @@ export async function POST(request: Request) {
             `status=${e?.status ?? "none"}, started=${started}): ${e?.message ?? String(err)}`,
         );
       } finally {
+        // A turn that produced nothing at all is not worth keeping: saved, it
+        // becomes a blank bubble in the transcript and dead weight in every
+        // later prompt. The parent's own message is already safely stored, so
+        // dropping this loses nothing they wrote.
         const { clean } = extractSuggestions(full);
-        await db.chatMessage.create({
-          data: { workspaceId, role: "assistant", content: clean || full },
-        });
+        const body = (clean || full).trim();
+        if (body) {
+          await db.chatMessage.create({
+            data: { workspaceId, role: "assistant", content: body },
+          });
+        }
         controller.close();
       }
     },
