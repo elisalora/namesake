@@ -85,6 +85,15 @@ export type ConsultantContext = {
   /// What the panel has already shown them as your opening line.
   opening?: string | null;
   members: { name: string }[];
+  /// True once more than one parent has joined, in which case every message
+  /// from them arrives prefixed with the name of whoever wrote it.
+  ///
+  /// Both parents share the single `user` role, so without the label a
+  /// disagreement between two people reads as one person contradicting
+  /// themselves two turns apart — and the consultant does the reasonable thing
+  /// with that, which is to hedge, split the difference, and ask again. That
+  /// is what going in circles looks like from the inside.
+  attributed?: boolean;
   shortlist: {
     firstName: string;
     middleName?: string | null;
@@ -160,6 +169,14 @@ export function buildSystemPrompt(ctx: ConsultantContext): string {
           .join("\n")
       : "(none yet)";
 
+  // Who is speaking. Only worth saying when there really are two of them —
+  // told to one person, it invites the consultant to look for a second voice
+  // that will never arrive.
+  const attribution =
+    ctx.attributed && parents.length > 1
+      ? `\n\nBoth of them write into this one conversation, so every message from them is prefixed with the name of whoever wrote it — "${parents[0]}: ..." — and the same names are on their screen beside each message. Read those labels and keep track of who thinks what. They will not always agree, and something one of them told you is not the other's view. When they differ, say so plainly and kindly rather than averaging the two into a position neither of them holds, and speak to one of them by name when the thing you're saying is really for them. Never put a name prefix on your own replies — you are the only one who isn't labelled.`
+      : "";
+
   const suggestions =
     ctx.newSuggestions.length > 0
       ? ctx.newSuggestions
@@ -186,7 +203,7 @@ ${
 }
 - You actively relax social pressure. Reassure them that it's their choice, that no name is perfect, that they're allowed to change their minds, and that the "right" name is the one that feels like theirs.
 
-Style: conversational and concise — a few short paragraphs at most. Warm but not saccharine. Write in plain text like a text message — NO markdown, no asterisks, no bold, no headers, no bullet-point avalanches. When you mention a specific name in the flow of a sentence, just write it plainly (Willow, not **Willow**). Speak to them as a couple.
+Style: conversational and concise — a few short paragraphs at most. Warm but not saccharine. Write in plain text like a text message — NO markdown, no asterisks, no bold, no headers, no bullet-point avalanches. When you mention a specific name in the flow of a sentence, just write it plainly (Willow, not **Willow**). Speak to them as a couple.${attribution}
 
 Middle names are their own list in the app, kept separately from first names, and they are chosen against a first name rather than instead of one. Treat them as their own conversation when it comes up: the middle name is where a grandmother, a maiden name, a saint, or a name one of them loves but couldn't quite put first tends to live, and it's said in full far less often than people fear. When you suggest middle names, say the whole name out loud in your reply — "Willow Rose Rivera" — because that's the only way to hear whether it works, and mention the initials if they make a word.
 

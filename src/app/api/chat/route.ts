@@ -58,7 +58,9 @@ export async function POST(request: Request) {
       // instead, so a long journey kept sending the model its opening
       // small-talk and none of the last hour — the consultant appeared to
       // forget everything the moment a couple really got going.
-      messages: { orderBy: { createdAt: "desc" }, take: 40 },
+      // `member` comes along because a turn is not just words — it's words
+      // said by one of two people, and which one changes what they mean.
+      messages: { orderBy: { createdAt: "desc" }, take: 40, include: { member: true } },
     },
   });
   if (!ws) return new Response("not_found", { status: 404 });
@@ -84,6 +86,16 @@ export async function POST(request: Request) {
         .join(" "),
     }));
 
+  // Only people who are actually here. An unclaimed seat would otherwise have
+  // the consultant addressing "Ada and Partner", or asking how the two of them
+  // feel, to someone doing this on their own.
+  const joined = ws.members.filter((m) => m.userId);
+
+  // With two parents writing into one thread, the model needs to know which of
+  // them is speaking — see `attributed` in ConsultantContext. With one, the
+  // labels would be noise.
+  const attributed = joined.length > 1;
+
   const ctx: ConsultantContext = {
     babyLabel: babiesLabel(ws.babyLabel, ws.babyCount),
     lastName: ws.lastName,
@@ -102,10 +114,8 @@ export async function POST(request: Request) {
       parents: namedParents(ws.members),
       babyCount: ws.babyCount,
     }),
-    // Only people who are actually here. An unclaimed seat would otherwise
-    // have the consultant addressing "Ada and Partner", or asking how the two
-    // of them feel, to someone doing this on their own.
-    members: ws.members.filter((m) => m.userId).map((m) => ({ name: m.name })),
+    members: joined.map((m) => ({ name: m.name })),
+    attributed,
     shortlist: ws.names
       .filter((n) => n.role !== "middle")
       .map((n) => ({
@@ -129,16 +139,28 @@ export async function POST(request: Request) {
     })),
   };
 
+  // Who said it, in the words themselves. Both parents share the single `user`
+  // role the API gives us, so attribution has nowhere else to live — and the
+  // prefix is the same name their bubble already carries on screen, so the
+  // consultant and the couple are looking at the same conversation.
+  //
+  // A seat can lose its member (deleted user, SetNull), which leaves a real
+  // message with nobody attached. Better an anonymous parent than a silent
+  // relabelling of their words as the other one's.
+  const say = (name: string | null | undefined, content: string) =>
+    attributed ? `${name?.trim() || "A parent"}: ${content}` : content;
+
   // Back into the order they were said in — the query fetched them newest
   // first to get the right end of a long conversation.
   const history: ChatTurn[] = [...ws.messages]
     .reverse()
-    .map((m) => ({
-      role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
-      content: m.content,
-    }));
+    .map((m) =>
+      m.role === "assistant"
+        ? { role: "assistant" as const, content: m.content }
+        : { role: "user" as const, content: say(m.member?.name, m.content) },
+    );
 
-  history.push({ role: "user", content: message });
+  history.push({ role: "user", content: say(member.name, message) });
 
   // Persist the parent's message with attribution.
   await db.chatMessage.create({

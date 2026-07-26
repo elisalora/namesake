@@ -7,7 +7,6 @@ import { namedParents } from "@/lib/seat";
 import { babiesLabel, slots } from "@/lib/babies";
 
 type Me = { id: string; name: string; color: string };
-type Msg = { role: string; content: string; authorName?: string | null; authorColor?: string | null };
 
 function displayText(t: string) {
   const i = t.indexOf("[[");
@@ -30,14 +29,41 @@ function parseSuggestions(t: string): Chip[] {
   return [...pick("SUGGESTIONS", "first"), ...pick("MIDDLES", "middle")];
 }
 
-export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; me: Me; onChanged: () => void }) {
-  const [messages, setMessages] = useState<Msg[]>(ws.messages);
+export default function ChatPanel({
+  ws,
+  me,
+  onChanged,
+}: {
+  ws: WorkspaceState;
+  me: Me;
+  onChanged: () => void | Promise<void>;
+}) {
+  // The transcript is whatever the server says it is.
+  //
+  // It used to be seeded into state here, which meant it was fixed at mount:
+  // the dashboard polls every few seconds and every other panel followed
+  // along, but this one never did. So you never saw your partner's messages,
+  // or the consultant's replies to them — while the server was faithfully
+  // sending the model both halves. The consultant answered questions you
+  // hadn't seen asked and referred to names you hadn't seen offered, which
+  // reads exactly like it has lost the thread. It hadn't; you just weren't
+  // being shown the same conversation.
   const [input, setInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
+  /// The turn currently in flight — the one exchange that exists on screen
+  /// before it exists in the database. `afterId` is the last message the
+  /// server had when we started, so we can tell our own echo from an identical
+  /// thing somebody typed an hour ago.
+  const [sending, setSending] = useState<{ text: string; afterId: string | null } | null>(null);
   const [live, setLive] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [chips, setChips] = useState<Chip[]>([]);
   const [added, setAdded] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
+  /// Whether they were reading the newest message when the last one arrived.
+  /// Now that a partner's words can land unprompted, following the bottom of
+  /// the conversation is only ever right if that's where they already were.
+  const atBottom = useRef(true);
+  const streaming = sending !== null;
   const decided = ws.status === "decided";
   const multiple = ws.babyCount > 1;
   const opening = openingMessage({
@@ -47,16 +73,44 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
   });
   const waiting = slots(ws.babyCount).filter((s) => !ws.chosen.some((c) => c.slot === s));
 
+  // Our own message, once the server has it. Until then the optimistic bubble
+  // below stands in for it; after, the two would be the same words twice.
+  const echoed = (() => {
+    if (!sending) return false;
+    const at = sending.afterId ? ws.messages.findIndex((m) => m.id === sending.afterId) : -1;
+    return ws.messages.slice(at + 1).some((m) => m.role === "user" && m.content === sending.text);
+  })();
+
+  // What the transcript *is*, rather than which array happens to hold it. The
+  // poll hands back a freshly parsed `ws.messages` every few seconds, so
+  // depending on the array itself fires this effect on a timer even when
+  // nothing was said — and each firing started another smooth scroll, which
+  // dragged the reader back down mid-sentence and then, as it animated,
+  // reported them as sitting at the bottom again. The guard below was correct
+  // and never got the chance to work.
+  const transcript = `${ws.messages.length}:${ws.messages[ws.messages.length - 1]?.id ?? ""}`;
+
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, live]);
+    const el = scrollRef.current;
+    if (!el) return;
+    if (!atBottom.current && !sending) return;
+    // Set outright rather than animating. A smooth scroll is a request the
+    // browser can decline — it doesn't run at all in a background tab — so the
+    // panel would quietly stay where it was while messages piled up below,
+    // and you'd come back to the tab already scrolled away from the newest
+    // thing. It also tracks a streaming reply better: the text grows several
+    // times a second, and an animation is still chasing the last position when
+    // the next one arrives.
+    el.scrollTop = el.scrollHeight;
+  }, [transcript, live, sending]);
 
   async function send(text: string) {
-    if (!text.trim() || streaming) return;
+    const body = text.trim();
+    if (!body || sending) return;
     setInput("");
     setChips([]);
-    setMessages((m) => [...m, { role: "user", content: text, authorName: me.name, authorColor: me.color }]);
-    setStreaming(true);
+    setError(null);
+    setSending({ text: body, afterId: ws.messages[ws.messages.length - 1]?.id ?? null });
     setLive("");
 
     let acc = "";
@@ -64,7 +118,7 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceId: ws.id, message: text }),
+        body: JSON.stringify({ workspaceId: ws.id, message: body }),
       });
       if (!res.body) throw new Error("no stream");
       const reader = res.body.getReader();
@@ -75,15 +129,27 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
         acc += decoder.decode(value, { stream: true });
         setLive(displayText(acc));
       }
+      setChips(parseSuggestions(acc));
     } catch {
-      acc += "\n\n(Sorry — something interrupted us. Try once more?)";
+      // Nothing came back at all, so this almost certainly never reached the
+      // server — the route answers its own failures in words, and any of those
+      // would have landed in `acc`. Give them back what they typed rather than
+      // swallowing it, and don't paint a reply the consultant never made.
+      if (!acc) {
+        setInput(body);
+        setError("That didn't send. Nothing's lost — try once more.");
+      }
     }
 
-    const clean = displayText(acc);
-    setMessages((m) => [...m, { role: "assistant", content: clean }]);
-    setChips(parseSuggestions(acc));
-    setLive("");
-    setStreaming(false);
+    // The server writes the reply before it closes the stream, so by now both
+    // turns are in the database and a refresh returns the real transcript.
+    // That's what the optimistic bubbles were standing in for.
+    try {
+      await onChanged();
+    } finally {
+      setSending(null);
+      setLive("");
+    }
   }
 
   async function addChip({ name, role }: Chip) {
@@ -160,8 +226,15 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
         </div>
       )}
 
-      <div ref={scrollRef} className="scroll-soft flex-1 space-y-4 overflow-y-auto px-5 py-5">
-        {messages.length === 0 && (
+      <div
+        ref={scrollRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+        }}
+        className="scroll-soft flex-1 space-y-4 overflow-y-auto px-5 py-5"
+      >
+        {ws.messages.length === 0 && !sending && (
           <div className="animate-rise space-y-3">
             {/* Same text the server hands the model as its opening turn, so
                 what's on screen and what the model believes it said agree. */}
@@ -182,17 +255,25 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
           </div>
         )}
 
-        {messages.map((m, i) => (
-          <Bubble key={i} role={m.role} author={m.authorName} color={m.authorColor}>
+        {ws.messages.map((m) => (
+          <Bubble key={m.id} role={m.role} author={m.authorName} color={m.authorColor}>
             {m.content}
           </Bubble>
         ))}
+
+        {sending && !echoed && (
+          <Bubble role="user" author={me.name} color={me.color}>
+            {sending.text}
+          </Bubble>
+        )}
 
         {streaming && (
           <Bubble role="assistant">
             {live || <span className="inline-flex gap-1 text-pewter"><Dot /><Dot d={0.2} /><Dot d={0.4} /></span>}
           </Bubble>
         )}
+
+        {error && <div className="pl-1 text-xs text-ink-soft">{error}</div>}
 
         {chips.length > 0 && !streaming && (
           <div className="flex flex-wrap gap-2 pl-1">
