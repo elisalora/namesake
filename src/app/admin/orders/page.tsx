@@ -27,7 +27,17 @@ export default async function OrdersPage(props: {
       ...(showAll ? {} : { fulfilledAt: null }),
     },
     orderBy: { paidAt: "asc" },
-    include: { items: true, workspace: { include: { chosenName: true } } },
+    include: {
+      items: true,
+      workspace: {
+        include: {
+          names: {
+            where: { role: "first", chosenSlot: { not: null } },
+            orderBy: { chosenSlot: "asc" },
+          },
+        },
+      },
+    },
   });
 
   return (
@@ -50,8 +60,12 @@ export default async function OrdersPage(props: {
         <ul className="mt-8 space-y-4">
           {orders.map((order) => {
             const address = parseAddress(order.shippingAddress);
-            const chosenName = order.workspace?.chosenName?.firstName ?? null;
-            const waitingOnName = order.items.some((i) => i.shipsAfterNaming) && !chosenName;
+            const chosenName = order.workspace?.names.map((n) => n.firstName).join(" & ") || null;
+            // Twins: an engraved keepsake can't be made until both names are
+            // settled, so what's being waited on is the whole decision, not
+            // the first name to arrive.
+            const waitingOnName =
+              order.items.some((i) => i.shipsAfterNaming) && order.workspace?.status !== "decided";
 
             return (
               <li

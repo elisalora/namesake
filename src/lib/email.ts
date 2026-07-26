@@ -163,6 +163,28 @@ export function sendBoxOnItsWay(to: string, url: string, recipientWasEmailed: bo
   );
 }
 
+/// Sent when a keepsake is ordered after the name is chosen. The link is a
+/// permanent one — their journey — not a single-use magic link, so it uses its
+/// own footer rather than shell's expiry note.
+export function sendKeepsakeOrdered(to: string, url: string) {
+  const html = `
+  <div style="margin:0;padding:32px 16px;background:#f5f2e9;font-family:ui-sans-serif,-apple-system,'Segoe UI',Helvetica,sans-serif;">
+    <div style="max-width:520px;margin:0 auto;background:#fdfcf7;border:1px solid #ded8c9;border-radius:22px;padding:38px;">
+      <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#9aa1a2;font-weight:600;">Namesake</div>
+      <h1 style="margin:16px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.15;color:#262b26;font-weight:500;">Thank you — we're making it.</h1>
+      <p style="margin:16px 0 30px;font-size:16px;line-height:1.65;color:#5f655d;">Your keepsake is being made with the name you chose, and will ship once it's ready. We'll be in touch if we need anything.</p>
+      <a href="${url}" style="display:inline-block;background:#55654f;color:#ffffff;text-decoration:none;padding:14px 30px;border-radius:999px;font-size:16px;font-weight:600;">See the keepsake</a>
+      <p style="margin:30px 0 0;font-size:13px;line-height:1.6;color:#8b918a;">Keep this as your receipt. Questions about your order? Just reply.</p>
+    </div>
+  </div>`;
+  return send(
+    to,
+    "Your Namesake keepsake is on its way",
+    html,
+    `Thank you — your Namesake keepsake is being made with the name you chose, and will ship once it's ready. Your journey: ${url}`,
+  );
+}
+
 function escapeHtml(s: string) {
   return s.replace(
     /[&<>"']/g,

@@ -27,7 +27,12 @@ export default function ShortlistPanel({
   const [first, setFirst] = useState("");
   const [middle, setMiddle] = useState("");
   const [adding, setAdding] = useState(false);
+  // Which list is on screen. A middle name is chosen against a first name
+  // rather than instead of one, so the two lists are the same shortlist seen
+  // from two sides rather than two competing places to put a name.
+  const [list, setList] = useState<"first" | "middle">("first");
   const decided = ws.status === "decided";
+  const middles = ws.names.filter((n) => n.role === "middle");
 
   const pending = ws.suggestions.filter((s) => s.status === "pending");
 
@@ -39,7 +44,7 @@ export default function ShortlistPanel({
   );
 
   // Sort: chosen first, then by combined hearts desc, vetoed sink to bottom.
-  const sorted = [...ws.names].sort((a, b) => {
+  const sorted = [...ws.names.filter((n) => n.role !== "middle")].sort((a, b) => {
     if (a.status === "chosen") return -1;
     if (b.status === "chosen") return 1;
     const av = a.ratings.some((r) => r.veto) ? 1 : 0;
@@ -47,6 +52,17 @@ export default function ShortlistPanel({
     if (av !== bv) return av - bv;
     const sum = (n: typeof a) => n.ratings.reduce((t, r) => t + r.score, 0);
     return sum(b) - sum(a);
+  });
+
+  const heartsOn = (n: WorkspaceState["names"][number]) =>
+    n.ratings.reduce((t, r) => t + r.score, 0);
+  const sortedMiddles = [...middles].sort((a, b) => {
+    if (a.chosenSlot !== null) return -1;
+    if (b.chosenSlot !== null) return 1;
+    const av = a.ratings.some((r) => r.veto) ? 1 : 0;
+    const bv = b.ratings.some((r) => r.veto) ? 1 : 0;
+    if (av !== bv) return av - bv;
+    return heartsOn(b) - heartsOn(a);
   });
 
   // A name we've never classified stays visible under every filter — better to
@@ -70,8 +86,9 @@ export default function ShortlistPanel({
     setAdding(true);
     const res = await post("/api/names", {
       workspaceId: ws.id,
+      role: list,
       firstName: first.trim(),
-      middleName: middle.trim() || undefined,
+      middleName: list === "middle" ? undefined : middle.trim() || undefined,
       source: "parent",
     });
     setFirst("");
@@ -113,11 +130,34 @@ export default function ShortlistPanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-4 flex items-baseline justify-between">
+      <div className="mb-3 flex items-baseline justify-between">
         <h2 className="font-display text-2xl text-ink">Your shortlist</h2>
         <span className="text-sm text-ink-soft">
-          {ws.names.length} {ws.names.length === 1 ? "name" : "names"}
+          {sorted.length} {sorted.length === 1 ? "name" : "names"}
         </span>
+      </div>
+
+      {/* The two halves of a name. Middle names get their own list rather than
+          a second field on every card, because they're weighed on their own —
+          hearts, a note, a veto — and only ever against a first name. */}
+      <div className="mb-4 flex rounded-full border border-line bg-card p-1 text-sm">
+        {(
+          [
+            ["first", "First names", sorted.length],
+            ["middle", "Middle names", middles.length],
+          ] as const
+        ).map(([key, label, count]) => (
+          <button
+            key={key}
+            onClick={() => setList(key)}
+            className={`flex-1 rounded-full py-1.5 font-semibold transition ${
+              list === key ? "bg-pewter text-white" : "text-ink-soft hover:text-pewter"
+            }`}
+          >
+            {label}
+            {count > 0 && <span className="ml-1.5 opacity-70">{count}</span>}
+          </button>
+        ))}
       </div>
 
       {!decided && !ws.expired && (
@@ -125,15 +165,17 @@ export default function ShortlistPanel({
           <input
             value={first}
             onChange={(e) => setFirst(e.target.value)}
-            placeholder="Add a name…"
+            placeholder={list === "middle" ? "Add a middle name…" : "Add a name…"}
             className="flex-1 rounded-xl border border-line bg-card px-3.5 py-2.5 outline-none focus:border-sage"
           />
-          <input
-            value={middle}
-            onChange={(e) => setMiddle(e.target.value)}
-            placeholder="middle (optional)"
-            className="w-32 rounded-xl border border-line bg-card px-3 py-2.5 text-sm outline-none focus:border-sage"
-          />
+          {list === "first" && (
+            <input
+              value={middle}
+              onChange={(e) => setMiddle(e.target.value)}
+              placeholder="middle (optional)"
+              className="w-32 rounded-xl border border-line bg-card px-3 py-2.5 text-sm outline-none focus:border-sage"
+            />
+          )}
           <button disabled={adding} className="rounded-xl bg-sage-deep px-4 font-semibold text-white transition hover:bg-pewter">
             Add
           </button>
@@ -175,7 +217,7 @@ export default function ShortlistPanel({
         </div>
       )}
 
-      {sorted.length > 1 && (
+      {list === "first" && sorted.length > 1 && (
         <div className="mb-3 flex flex-wrap items-center gap-1.5">
           {(
             [
@@ -204,6 +246,36 @@ export default function ShortlistPanel({
       )}
 
       <div className="flex-1 space-y-3">
+        {list === "middle" ? (
+          <>
+            {sortedMiddles.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-line bg-card/50 p-8 text-center text-ink-soft">
+                <p className="font-display text-lg text-pewter">No middle names yet</p>
+                <p className="mt-1 text-sm">
+                  Add one above, or ask the consultant — this is where a grandmother, a maiden
+                  name, or the one you love but can&apos;t quite put first tends to live. Each one
+                  is shown against your leading first name so you can hear the whole thing.
+                </p>
+              </div>
+            ) : (
+              sortedMiddles.map((n) => (
+                <NameCard
+                  key={n.id}
+                  name={n}
+                  me={me}
+                  members={ws.members}
+                  onChanged={onChanged}
+                  onChoose={onChoose}
+                  decided={decided}
+                  babyCount={ws.babyCount}
+                  workspaceId={ws.id}
+                  chosen={ws.chosen}
+                />
+              ))
+            )}
+          </>
+        ) : (
+          <>
         {sorted.length > 0 && names.length === 0 && (
           <div className="rounded-2xl border border-dashed border-line bg-card/50 p-8 text-center text-ink-soft">
             <p className="text-sm">Nothing on your list leans that way yet.</p>
@@ -219,8 +291,21 @@ export default function ShortlistPanel({
           </div>
         )}
         {names.map((n) => (
-          <NameCard key={n.id} name={n} me={me} members={ws.members} onChanged={onChanged} onChoose={onChoose} decided={decided} />
+          <NameCard
+            key={n.id}
+            name={n}
+            me={me}
+            members={ws.members}
+            onChanged={onChanged}
+            onChoose={onChoose}
+            decided={decided}
+            babyCount={ws.babyCount}
+            workspaceId={ws.id}
+            chosen={ws.chosen}
+          />
         ))}
+          </>
+        )}
       </div>
     </div>
   );

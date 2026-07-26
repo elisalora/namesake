@@ -63,9 +63,13 @@ export default async function DevCheckoutPage(props: { params: Promise<{ id: str
           {alreadyDone ? (
             <p className="text-sm text-ink-soft">
               This one has already been paid.{" "}
-              {purchase.kind === "extend" ? (
+              {purchase.kind === "extend" || purchase.kind === "keepsake" ? (
                 <Link
-                  href={`/w/${purchase.workspaceId}`}
+                  href={
+                    purchase.kind === "keepsake"
+                      ? `/w/${purchase.workspaceId}?keepsake=thanks`
+                      : `/w/${purchase.workspaceId}`
+                  }
                   className="font-semibold text-sage-deep hover:text-pewter"
                 >
                   Back to the journey →
@@ -85,7 +89,9 @@ export default async function DevCheckoutPage(props: { params: Promise<{ id: str
               fallbackHref={
                 purchase.kind === "extend"
                   ? `/w/${purchase.workspaceId}?extended=1`
-                  : `/redeem/${purchase.redeemCode}`
+                  : purchase.kind === "keepsake"
+                    ? `/w/${purchase.workspaceId}?keepsake=thanks`
+                    : `/redeem/${purchase.redeemCode}`
               }
             />
           )}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import ExpectingChoice, { type Expecting } from "./ExpectingChoice";
+import MultiplesChoice from "./MultiplesChoice";
 
 export default function StartForm({ priceLabel }: { priceLabel: string }) {
   const [loading, setLoading] = useState(false);
@@ -14,6 +15,7 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
     babyLabel: "",
     lastName: "",
   });
+  const [babyCount, setBabyCount] = useState(1);
   const [expecting, setExpecting] = useState<Expecting | "">("");
 
   function set<K extends keyof typeof form>(k: K, v: string) {
@@ -44,6 +46,7 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
             partner: { name: form.partner.trim(), email: form.partnerEmail.trim() },
             babyLabel: form.babyLabel.trim(),
             lastName: form.lastName.trim(),
+            babyCount,
             expecting: expecting || undefined,
           },
         }),
@@ -97,15 +100,24 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
           placeholder="Rivera"
         />
         <Field
-          label="What you call the bump"
+          label={babyCount > 1 ? "What you call them" : "What you call the bump"}
           hint="optional"
           value={form.babyLabel}
           onChange={(v) => set("babyLabel", v)}
-          placeholder="Peanut"
+          placeholder={babyCount > 1 ? "The Beans" : "Peanut"}
         />
       </div>
 
-      <ExpectingChoice value={expecting} onChange={setExpecting} />
+      <MultiplesChoice
+        value={babyCount}
+        onChange={(n) => {
+          setBabyCount(n);
+          // "One of each" can't survive a change back to one baby.
+          if (n === 1 && expecting === "mixed") setExpecting("");
+        }}
+      />
+
+      <ExpectingChoice value={expecting} onChange={setExpecting} babyCount={babyCount} />
 
       {error && <p className="text-sm text-sage-deep">{error}</p>}
 

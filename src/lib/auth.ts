@@ -265,14 +265,24 @@ export async function getJourneysForUser(userId: string) {
   const seats = await db.member.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
-    include: { workspace: { include: { chosenName: true } } },
+    include: {
+      workspace: {
+        include: {
+          names: {
+            where: { role: "first", chosenSlot: { not: null } },
+            orderBy: { chosenSlot: "asc" },
+          },
+        },
+      },
+    },
   });
 
   return seats.map((seat) => ({
     workspaceId: seat.workspaceId,
     babyLabel: seat.workspace.babyLabel,
     status: seat.workspace.status,
-    chosenName: seat.workspace.chosenName?.firstName ?? null,
+    // "Named Willow & Elias" for twins; the same single name as before for one.
+    chosenName: seat.workspace.names.map((n) => n.firstName).join(" & ") || null,
     createdAt: seat.workspace.createdAt.toISOString(),
   }));
 }

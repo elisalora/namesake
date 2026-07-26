@@ -3,6 +3,7 @@ import { nanoid, customAlphabet } from "nanoid";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { DEFAULT_PARTNER_NAME } from "@/lib/seat";
+import { MAX_BABIES } from "@/lib/babies";
 
 const slugId = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 10);
 
@@ -21,9 +22,14 @@ const PALETTE = ["#7d8f76", "#a98a4f"];
 export const journeyDraft = z.object({
   babyLabel: z.string().trim().max(60).optional(),
   lastName: z.string().trim().max(60).optional(),
+  /// Twins and triplets. Asked at the start because it changes the whole
+  /// journey — two names, weighed against each other — and finding out
+  /// halfway through is worse than one more question here.
+  babyCount: z.number().int().min(1).max(MAX_BABIES).optional(),
   /// "surprise" is a real answer — it means they know they don't want to know,
-  /// which is different from never having been asked.
-  expecting: z.enum(["girl", "boy", "surprise"]).optional(),
+  /// which is different from never having been asked. "mixed" is one of each,
+  /// which only exists once there's more than one baby.
+  expecting: z.enum(["girl", "boy", "mixed", "surprise"]).optional(),
   dueDate: z.string().optional(),
   you: z.object({
     name: z.string().trim().min(1).max(60),
@@ -63,7 +69,10 @@ export async function createJourney(
     data: {
       babyLabel: draft.babyLabel?.trim() || "Baby",
       lastName: draft.lastName?.trim() || null,
-      expecting: draft.expecting ?? null,
+      babyCount: draft.babyCount ?? 1,
+      // "One of each" is only meaningful with more than one baby; if the count
+      // came back to one, the answer it belonged to is gone with it.
+      expecting: draft.expecting === "mixed" && (draft.babyCount ?? 1) < 2 ? null : draft.expecting ?? null,
       dueDate: draft.dueDate ? new Date(draft.dueDate) : null,
       expiresAt: opts.expiresAt ?? null,
       suggestSlug: opts.suggestSlug || slugId(),

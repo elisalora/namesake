@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { WorkspaceState } from "@/lib/workspace";
-import { openingMessage, CONVERSATION_STARTERS } from "@/lib/opening";
+import { openingMessage, CONVERSATION_STARTERS, MULTIPLES_STARTERS } from "@/lib/opening";
 import { namedParents } from "@/lib/seat";
+import { babiesLabel, slots } from "@/lib/babies";
 
 type Me = { id: string; name: string; color: string };
 type Msg = { role: string; content: string; authorName?: string | null; authorColor?: string | null };
@@ -13,10 +14,20 @@ function displayText(t: string) {
   return i >= 0 ? t.slice(0, i).trimEnd() : t;
 }
 
-function parseSuggestions(t: string): string[] {
-  const m = t.match(/\[\[SUGGESTIONS:\s*([^\]]+)\]\]/i);
-  if (!m) return [];
-  return m[1].split(",").map((s) => s.trim()).filter(Boolean);
+/// Names the consultant offered to save, and which list each belongs on.
+type Chip = { name: string; role: "first" | "middle" };
+
+function parseSuggestions(t: string): Chip[] {
+  const pick = (label: string, role: Chip["role"]): Chip[] => {
+    const m = t.match(new RegExp(`\\[\\[${label}:\\s*([^\\]]+)\\]\\]`, "i"));
+    if (!m) return [];
+    return m[1]
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((name) => ({ name, role }));
+  };
+  return [...pick("SUGGESTIONS", "first"), ...pick("MIDDLES", "middle")];
 }
 
 export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; me: Me; onChanged: () => void }) {
@@ -24,14 +35,17 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [live, setLive] = useState("");
-  const [chips, setChips] = useState<string[]>([]);
+  const [chips, setChips] = useState<Chip[]>([]);
   const [added, setAdded] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const decided = ws.status === "decided";
+  const multiple = ws.babyCount > 1;
   const opening = openingMessage({
-    babyLabel: ws.babyLabel,
+    babyLabel: babiesLabel(ws.babyLabel, ws.babyCount),
     parents: namedParents(ws.members),
+    babyCount: ws.babyCount,
   });
+  const waiting = slots(ws.babyCount).filter((s) => !ws.chosen.some((c) => c.slot === s));
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -72,14 +86,22 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
     setStreaming(false);
   }
 
-  async function addChip(nameStr: string) {
-    const [firstName, ...rest] = nameStr.split(" ");
+  async function addChip({ name, role }: Chip) {
+    const [firstName, ...rest] = name.split(" ");
     const res = await fetch("/api/names", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId: ws.id, firstName, middleName: rest.join(" ") || undefined, source: "ai" }),
+      body: JSON.stringify({
+        workspaceId: ws.id,
+        role,
+        // A middle name is one word — anything after it belongs to the first
+        // name it will sit beside.
+        firstName: role === "middle" ? name : firstName,
+        middleName: role === "middle" ? undefined : rest.join(" ") || undefined,
+        source: "ai",
+      }),
     });
-    setAdded((s) => new Set(s).add(nameStr));
+    setAdded((s) => new Set(s).add(name));
     onChanged();
     try {
       const { id } = await res.clone().json();
@@ -105,6 +127,39 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
         </div>
       </div>
 
+      {/* The pair, held in view.
+          Once one twin has a name, that name is the thing every remaining name
+          is measured against — so it sits pinned under the header rather than
+          scrolling away up the conversation, and it's the same fact the
+          consultant is being given on every turn. */}
+      {multiple && (
+        <div className="border-b border-line bg-butter-soft/50 px-5 py-2.5 text-xs leading-relaxed text-[#8a6d1f]">
+          {ws.chosen.length === 0 ? (
+            <>
+              <span className="font-semibold">
+                {ws.babyCount === 3 ? "Three names" : "Two names"} to find.
+              </span>{" "}
+              I&apos;ll weigh each one on its own and as a set — how they sound side by side,
+              initials, and whether they&apos;re too matchy.
+            </>
+          ) : (
+            <>
+              {ws.chosen.map((c) => (
+                <span key={c.slot} className="mr-2">
+                  <span className="font-semibold">{c.label}:</span> {c.fullName} ✦
+                </span>
+              ))}
+              {waiting.length > 0 && (
+                <>
+                  Every name from here is weighed beside{" "}
+                  {ws.chosen.map((c) => c.firstName).join(" and ")} — say them out loud together.
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       <div ref={scrollRef} className="scroll-soft flex-1 space-y-4 overflow-y-auto px-5 py-5">
         {messages.length === 0 && (
           <div className="animate-rise space-y-3">
@@ -113,7 +168,7 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
             <Bubble role="assistant">{opening}</Bubble>
             {!decided && (
               <div className="flex flex-wrap gap-2 pl-1">
-                {CONVERSATION_STARTERS.map((s) => (
+                {(multiple ? MULTIPLES_STARTERS : CONVERSATION_STARTERS).map((s) => (
                   <button
                     key={s}
                     onClick={() => send(s)}
@@ -142,17 +197,26 @@ export default function ChatPanel({ ws, me, onChanged }: { ws: WorkspaceState; m
         {chips.length > 0 && !streaming && (
           <div className="flex flex-wrap gap-2 pl-1">
             {chips.map((c) => {
-              const isAdded = added.has(c);
+              const isAdded = added.has(c.name);
+              const middle = c.role === "middle";
               return (
                 <button
-                  key={c}
+                  key={`${c.role}:${c.name}`}
                   onClick={() => !isAdded && addChip(c)}
                   disabled={isAdded}
                   className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    isAdded ? "bg-sage/20 text-sage" : "border border-sage bg-butter-soft text-sage-deep hover:bg-sage hover:text-white"
+                    isAdded
+                      ? "bg-sage/20 text-sage"
+                      : middle
+                        ? "border border-gold/70 bg-butter-soft text-[#8a6d1f] hover:bg-gold hover:text-white"
+                        : "border border-sage bg-butter-soft text-sage-deep hover:bg-sage hover:text-white"
                   }`}
                 >
-                  {isAdded ? `✓ ${c} saved` : `+ Save ${c}`}
+                  {isAdded
+                    ? `✓ ${c.name} saved`
+                    : middle
+                      ? `+ ${c.name} as a middle name`
+                      : `+ Save ${c.name}`}
                 </button>
               );
             })}

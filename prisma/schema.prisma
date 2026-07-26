@@ -142,20 +142,24 @@ model PurchaseItem {
 
 /// The couple's private space — their "nest".
 model Workspace {
-  id            String    @id @default(cuid())
-  babyLabel     String    @default("Baby") // e.g. "Baby Alora" or "Peanut"
-  lastName      String? // family surname, used for initials + flow checks
-  /// girl | boy | surprise | null. Steers the consultant and the default
-  /// shortlist filter. "surprise" is a real answer, not a missing one.
-  expecting     String?
-  dueDate       DateTime?
-  status        String    @default("active") // active | decided | archived
-  expiresAt     DateTime? // end of the paid window; null = grandfathered, no expiry
-  suggestSlug   String    @unique // public slug for the family suggestion link
-  chosenNameId  String?   @unique
-  decidedReason String? // the story of why they chose — for the keepsake PDF
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  babyLabel   String    @default("Baby") // e.g. "Baby Alora" or "Peanut"
+  lastName    String? // family surname, used for initials + flow checks
+  /// How many babies this journey has to name — 1, or 2 for twins, 3 for
+  /// triplets. Everything downstream is counted against it: the decision is
+  /// made once per baby, and the journey is only `decided` when every one of
+  /// them has a name.
+  babyCount   Int       @default(1)
+  /// girl | boy | mixed | surprise | null. Steers the consultant and the
+  /// default shortlist filter. "surprise" is a real answer, not a missing one,
+  /// and "mixed" only means anything when there's more than one baby.
+  expecting   String?
+  dueDate     DateTime?
+  status      String    @default("active") // active | decided | archived
+  expiresAt   DateTime? // end of the paid window; null = grandfathered, no expiry
+  suggestSlug String    @unique // public slug for the family suggestion link
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   members     Member[]
   names       NameEntry[]
@@ -163,7 +167,6 @@ model Workspace {
   suggestions Suggestion[]
   messages    ChatMessage[]
   purchases   Purchase[]
-  chosenName  NameEntry?    @relation("ChosenName", fields: [chosenNameId], references: [id])
 }
 
 /// A parent's seat in one journey. Two per workspace, typically.
@@ -193,10 +196,25 @@ model Member {
 }
 
 /// A candidate name on the shortlist.
+///
+/// The shortlist is one shared pool even for twins — a name isn't spoken for
+/// until it's chosen, and parents weigh the whole list for both babies. Which
+/// baby a name belongs to is therefore something the decision decides, not
+/// something a candidate carries around.
+///
+/// Middle names are entries too, marked by `role`, rather than a second kind
+/// of thing with its own table. A middle name gets weighed exactly like a
+/// first one — hearts from both parents, notes, a veto, a meaning — and none
+/// of that had to be built twice for it.
 model NameEntry {
   id           String   @id @default(cuid())
   workspaceId  String
+  /// first | middle — which part of the name this is a candidate for.
+  role         String   @default("first")
   firstName    String
+  /// A middle typed inline beside a first name, the way people say a name out
+  /// loud ("Willow Alice"). Still supported, and used when no middle has been
+  /// chosen from the middle list for that baby.
   middleName   String?
   lastName     String? // overrides workspace surname when set
   gender       String? // girl | boy | neutral
@@ -205,12 +223,22 @@ model NameEntry {
   status       String   @default("considering") // considering | shortlist | vetoed | chosen
   source       String   @default("parent") // parent | suggestion | ai
   suggestionId String? // links back to the Suggestion it came from
+  /// Set when this name is chosen: which baby it's for, 1-based, so slot 1 is
+  /// Baby A. Null for every name still under consideration. Unique per
+  /// workspace and role, so a baby has one first name and one middle name and
+  /// no double tap can give them two.
+  chosenSlot   Int?
+  /// The story of why they chose it — one per baby, because with twins there
+  /// are two stories and the keepsake should carry both.
+  chosenReason String?
   createdAt    DateTime @default(now())
 
-  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   ratings   Rating[]
   comments  Comment[]
-  chosenFor Workspace? @relation("ChosenName")
+
+  @@unique([workspaceId, role, chosenSlot])
+  @@index([workspaceId, role])
 }
 
 /// One parent's feelings about one name: a heart score, and veto power.

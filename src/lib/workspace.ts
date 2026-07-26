@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
-import { analyzeName } from "@/lib/nameChecks";
+import { analyzeName, type Sibling } from "@/lib/nameChecks";
 import { hasExpired } from "@/lib/session";
+import { slotLabel } from "@/lib/babies";
 
 export async function getWorkspaceState(workspaceId: string) {
   const ws = await db.workspace.findUnique({
@@ -16,27 +17,90 @@ export async function getWorkspaceState(workspaceId: string) {
       },
       suggestions: { orderBy: { createdAt: "desc" } },
       messages: { orderBy: { createdAt: "asc" }, take: 200, include: { member: true } },
-      chosenName: true,
     },
   });
   if (!ws) return null;
 
+  const firsts = ws.names.filter((n) => n.role !== "middle");
+  const middles = ws.names.filter((n) => n.role === "middle");
+
+  // The middle name a baby actually ends up with: the one chosen from the
+  // middle list, or — for the couple who simply typed "Willow Alice" and never
+  // opened that list — the one sitting inline on the first name. One rule, in
+  // one place, so nothing downstream has to decide this for itself.
+  const chosenMiddleBySlot = new Map(
+    middles.filter((n) => n.chosenSlot !== null).map((n) => [n.chosenSlot!, n]),
+  );
+  const middleFor = (n: (typeof firsts)[number]) =>
+    (n.chosenSlot !== null ? chosenMiddleBySlot.get(n.chosenSlot)?.firstName : null) ??
+    n.middleName;
+
+  // The babies who already have a name. Every remaining candidate is measured
+  // against them, because from here on a name is half of a pair.
+  const decided = firsts
+    .filter((n) => n.chosenSlot !== null)
+    .sort((a, b) => (a.chosenSlot ?? 0) - (b.chosenSlot ?? 0));
+
+  // A middle name is only ever heard between two others, so a candidate is
+  // shown against a real first name: the one already chosen, or whichever is
+  // furthest ahead on hearts. Alone it has nothing to be judged on.
+  const hearts = (n: (typeof firsts)[number] & { ratings: { score: number }[] }) =>
+    n.ratings.reduce((t, r) => t + r.score, 0);
+  const reference =
+    decided[0] ??
+    [...firsts]
+      .filter((n) => !n.ratings.some((r) => r.veto))
+      .sort((a, b) => hearts(b) - hearts(a))[0];
+
   const names = ws.names.map((n) => {
-    const checks = analyzeName({
-      firstName: n.firstName,
-      middleName: n.middleName,
-      lastName: n.lastName ?? ws.lastName,
-    });
+    const isMiddle = n.role === "middle";
+    const surname = n.lastName ?? ws.lastName;
+    const siblings: Sibling[] = isMiddle
+      ? // Twins sharing a middle name is a tradition, not a clash — and the
+        // pair checks belong on the first names, where they'd be said aloud.
+        []
+      : decided
+          .filter((d) => d.id !== n.id)
+          .map((d) => ({
+            label: slotLabel(d.chosenSlot!),
+            firstName: d.firstName,
+            middleName: middleFor(d),
+            lastName: d.lastName ?? ws.lastName,
+          }));
+    const checks = isMiddle
+      ? reference
+        ? analyzeName({
+            firstName: reference.firstName,
+            middleName: n.firstName,
+            lastName: reference.lastName ?? ws.lastName,
+          })
+        : []
+      : analyzeName(
+          { firstName: n.firstName, middleName: middleFor(n), lastName: surname },
+          siblings,
+        );
     return {
       id: n.id,
+      role: isMiddle ? "middle" : "first",
       firstName: n.firstName,
-      middleName: n.middleName,
-      lastName: n.lastName ?? ws.lastName,
+      middleName: isMiddle ? null : middleFor(n),
+      /// For a middle name: the whole name it would make, against the first
+      /// name it's being weighed beside. Null when there's nothing to try it
+      /// against yet.
+      pairedWith:
+        isMiddle && reference
+          ? [reference.firstName, n.firstName, reference.lastName ?? ws.lastName]
+              .filter(Boolean)
+              .join(" ")
+          : null,
+      lastName: surname,
       gender: n.gender,
       origin: n.origin,
       meaning: n.meaning,
       status: n.status,
       source: n.source,
+      chosenSlot: n.chosenSlot,
+      chosenReason: n.chosenReason,
       createdAt: n.createdAt.toISOString(),
       checks,
       ratings: n.ratings.map((r) => ({
@@ -60,6 +124,7 @@ export async function getWorkspaceState(workspaceId: string) {
     id: ws.id,
     babyLabel: ws.babyLabel,
     lastName: ws.lastName,
+    babyCount: ws.babyCount,
     expecting: ws.expecting,
     status: ws.status,
     suggestSlug: ws.suggestSlug,
@@ -71,8 +136,20 @@ export async function getWorkspaceState(workspaceId: string) {
     daysLeft: ws.expiresAt
       ? Math.ceil((ws.expiresAt.getTime() - Date.now()) / 86_400_000)
       : null,
-    decidedReason: ws.decidedReason,
-    chosenNameId: ws.chosenNameId,
+    // One entry per baby who has a name, in slot order. For a single baby
+    // this is the old `chosenName` and `decidedReason` in a list of one.
+    chosen: decided.map((n) => ({
+      slot: n.chosenSlot!,
+      label: slotLabel(n.chosenSlot!),
+      nameId: n.id,
+      firstName: n.firstName,
+      middleName: middleFor(n),
+      /// The middle-list entry behind that middle name, when it came from
+      /// there rather than being typed inline — so it can be unpicked.
+      middleId: chosenMiddleBySlot.get(n.chosenSlot!)?.id ?? null,
+      fullName: [n.firstName, middleFor(n), n.lastName ?? ws.lastName].filter(Boolean).join(" "),
+      reason: n.chosenReason,
+    })),
     createdAt: ws.createdAt.toISOString(),
     members: ws.members.map((m) => ({
       id: m.id,

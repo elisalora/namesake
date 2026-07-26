@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { WorkspaceState } from "@/lib/workspace";
 import ExpectingChoice, { type Expecting } from "./ExpectingChoice";
+import MultiplesChoice from "./MultiplesChoice";
+import { multipleWord } from "@/lib/babies";
 
 // Editing what was asked at the very start. Most of it was optional then, and
 // some of it wasn't known yet — a surname still being decided, a nickname that
@@ -19,11 +21,17 @@ export default function JourneyDetails({
   const [babyLabel, setBabyLabel] = useState(ws.babyLabel === "Baby" ? "" : ws.babyLabel);
   const [lastName, setLastName] = useState(ws.lastName ?? "");
   const [dueDate, setDueDate] = useState(ws.dueDate ? ws.dueDate.slice(0, 10) : "");
+  const [babyCount, setBabyCount] = useState(ws.babyCount);
   const [expecting, setExpecting] = useState<Expecting | "">(
     (ws.expecting as Expecting | null) ?? "",
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Scans change their minds. Coming down in number means a baby who has
+  // already been named stops existing, so say so plainly before they save
+  // rather than quietly dropping the name.
+  const losing = ws.chosen.filter((c) => c.slot > babyCount);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -36,6 +44,7 @@ export default function JourneyDetails({
         body: JSON.stringify({
           babyLabel: babyLabel.trim(),
           lastName: lastName.trim(),
+          babyCount,
           dueDate,
           expecting: expecting || null,
         }),
@@ -71,7 +80,31 @@ export default function JourneyDetails({
 
       <Field label="Due date" hint="optional" type="date" value={dueDate} onChange={setDueDate} />
 
-      <ExpectingChoice value={expecting} onChange={setExpecting} />
+      <MultiplesChoice
+        value={babyCount}
+        onChange={(n) => {
+          setBabyCount(n);
+          if (n === 1 && expecting === "mixed") setExpecting("");
+        }}
+      />
+
+      {babyCount > 1 && (
+        <p className="text-xs leading-relaxed text-ink-soft">
+          Two names, or three. Your consultant will weigh every name against the ones you&apos;ve
+          already chosen — how they sound side by side, initials, and whether the set is too
+          matchy. You&apos;ll choose one name at a time.
+        </p>
+      )}
+
+      {losing.length > 0 && (
+        <p className="rounded-xl bg-butter-soft/70 px-3 py-2 text-xs leading-relaxed text-[#8a6d1f]">
+          Going down to {babyCount === 1 ? "one baby" : multipleWord(babyCount)} puts{" "}
+          {losing.map((c) => c.fullName).join(" and ")} back on your shortlist — nothing is
+          deleted, and you can choose again whenever.
+        </p>
+      )}
+
+      <ExpectingChoice value={expecting} onChange={setExpecting} babyCount={babyCount} />
 
       <p className="text-xs leading-relaxed text-ink-soft">
         Changing the due date won&apos;t shorten or extend the time you&apos;ve paid for — that

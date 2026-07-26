@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { NameState } from "@/lib/workspace";
 import GenderMark, { nextGender } from "./GenderMark";
+import { slotLabel } from "@/lib/babies";
 
 type Me = { id: string; name: string; color: string };
 type Member = { id: string; name: string; color: string; isOwner: boolean; joined: boolean };
@@ -40,6 +41,9 @@ export default function NameCard({
   onChanged,
   onChoose,
   decided,
+  babyCount,
+  workspaceId,
+  chosen,
 }: {
   name: NameState;
   me: Me;
@@ -47,16 +51,27 @@ export default function NameCard({
   onChanged: () => void;
   onChoose: (nameId: string) => void;
   decided: boolean;
+  babyCount: number;
+  workspaceId: string;
+  /// The babies who already have a first name — the only things a middle name
+  /// can be attached to.
+  chosen: { slot: number; label: string; nameId: string; middleId: string | null }[];
 }) {
   const [showComments, setShowComments] = useState(false);
   const [comment, setComment] = useState("");
   const [showAllChecks, setShowAllChecks] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const full = [name.firstName, name.middleName, name.lastName].filter(Boolean).join(" ");
+  const isMiddle = name.role === "middle";
+  // A middle name is shown as itself, with the whole name it would make on the
+  // line beneath — you can't judge "Rose" without hearing "Willow Rose Rivera".
+  const full = isMiddle
+    ? name.firstName
+    : [name.firstName, name.middleName, name.lastName].filter(Boolean).join(" ");
   const myRating = name.ratings.find((r) => r.memberId === me.id);
   const vetoedBy = name.ratings.find((r) => r.veto);
-  const isChosen = name.status === "chosen";
+  // Which baby this name belongs to, if it's been given to one.
+  const isChosen = name.chosenSlot !== null;
 
   const headline =
     name.checks.find((c) => c.level === "watch") ??
@@ -100,6 +115,21 @@ export default function NameCard({
     setBusy(false);
   }
 
+  /// Give this middle name to a baby who already has a first one. It's the
+  /// same decision endpoint the first name went through — a middle name rides
+  /// along with a first name rather than being decided on its own.
+  async function setAsMiddleFor(slot: number, nameId: string, on: boolean) {
+    setBusy(true);
+    await post("/api/decide", {
+      workspaceId,
+      nameId,
+      slot,
+      middleId: on ? name.id : null,
+    });
+    onChanged();
+    setBusy(false);
+  }
+
   async function remove() {
     if (!window.confirm(`Remove ${name.firstName} from your list?`)) return;
     await post(`/api/names/${name.id}`, {}, "DELETE");
@@ -121,23 +151,67 @@ export default function NameCard({
           <h3 className={`font-display text-2xl leading-tight ${vetoedBy ? "text-ink-soft line-through decoration-1" : "text-ink"}`}>
             {full}
           </h3>
+          {name.pairedWith && (
+            <div className="mt-0.5 font-display text-sm text-pewter-light">{name.pairedWith}</div>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
-            <GenderMark gender={name.gender} onCycle={decided ? undefined : cycleGender} />
+            {/* A middle name doesn't lean girl or boy in any way that helps —
+                it's chosen against a first name that already has. */}
+            {!isMiddle && (
+              <GenderMark gender={name.gender} onCycle={decided ? undefined : cycleGender} />
+            )}
             {name.meaning && <span>{name.meaning}</span>}
             {name.origin && <span className="text-ink-soft/70">· {name.origin}</span>}
             {name.source === "suggestion" && (
               <span className="rounded-full bg-butter-soft px-2 py-0.5 text-sage-deep">from your circle</span>
             )}
-            {isChosen && <span className="rounded-full bg-gold/20 px-2 py-0.5 font-semibold text-[#8a6d1f]">chosen ✦</span>}
+            {/* For a middle name the button on the right already says which
+                baby has it — a badge as well would just be the same word
+                twice. */}
+            {isChosen && !isMiddle && (
+              <span className="rounded-full bg-gold/20 px-2 py-0.5 font-semibold text-[#8a6d1f]">
+                {babyCount > 1 ? `${slotLabel(name.chosenSlot!)} ✦` : "chosen ✦"}
+              </span>
+            )}
           </div>
         </div>
-        {!decided && (
-          <button
-            onClick={() => onChoose(name.id)}
-            className="shrink-0 rounded-full border border-gold/60 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-[#8a6d1f] transition hover:bg-gold/20"
-          >
-            This one ✦
-          </button>
+        {/* A first name can be chosen outright. A middle name can only be
+            given to a baby who already has one, so its buttons appear with
+            that baby and not before. */}
+        {isMiddle ? (
+          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+            {chosen.map((c) => {
+              const on = c.middleId === name.id;
+              return (
+                <button
+                  key={c.slot}
+                  onClick={() => setAsMiddleFor(c.slot, c.nameId, !on)}
+                  disabled={busy}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+                    on
+                      ? "border-gold bg-gold text-white"
+                      : "border-gold/60 bg-gold/10 text-[#8a6d1f] hover:bg-gold/20"
+                  }`}
+                >
+                  {on
+                    ? `${babyCount > 1 ? c.label : "Chosen"} ✦`
+                    : babyCount > 1
+                      ? `For ${c.label}`
+                      : "Make it the middle ✦"}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          !decided &&
+          !isChosen && (
+            <button
+              onClick={() => onChoose(name.id)}
+              className="shrink-0 rounded-full border border-gold/60 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-[#8a6d1f] transition hover:bg-gold/20"
+            >
+              This one ✦
+            </button>
+          )
         )}
       </div>
 

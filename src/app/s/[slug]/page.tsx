@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { namedParents, parentLine as buildParentLine } from "@/lib/seat";
+import { babiesLabel } from "@/lib/babies";
 import SuggestForm from "@/components/SuggestForm";
 
 export default async function SuggestPage(props: { params: Promise<{ slug: string }> }) {
@@ -49,10 +50,13 @@ export default async function SuggestPage(props: { params: Promise<{ slug: strin
     return (
       <main className="mx-auto flex max-w-lg flex-1 flex-col items-center justify-center px-6 py-16 text-center">
         <div className="mb-3 text-3xl">✦</div>
-        <h1 className="font-display text-3xl text-pewter">They&apos;ve chosen a name!</h1>
+        <h1 className="font-display text-3xl text-pewter">
+          They&apos;ve chosen {ws.babyCount > 1 ? "their names" : "a name"}!
+        </h1>
         <p className="mt-3 text-ink-soft">
-          {parentLine} {solo ? "has" : "have"} already found the name for {ws.babyLabel}. Thank you
-          so much for being part of it.
+          {parentLine} {solo ? "has" : "have"} already found the{" "}
+          {ws.babyCount > 1 ? "names" : "name"} for {babiesLabel(ws.babyLabel, ws.babyCount)}. Thank
+          you so much for being part of it.
         </p>
       </main>
     );
@@ -65,14 +69,17 @@ export default async function SuggestPage(props: { params: Promise<{ slug: strin
           Namesake
         </Link>
         <h1 className="mt-6 font-display text-4xl leading-tight text-ink">
-          Help {parentLine} name <span className="italic text-sage-deep">{ws.babyLabel}</span>
+          Help {parentLine} name{" "}
+          <span className="italic text-sage-deep">{babiesLabel(ws.babyLabel, ws.babyCount)}</span>
         </h1>
         <p className="mt-3 text-ink-soft">
           They&apos;d love your ideas. Suggest a name you adore — a family name, one with a
           story, anything that feels right. Your note goes straight to them.
+          {ws.babyCount > 1 &&
+            ` They're expecting ${ws.babyCount === 3 ? "triplets" : "twins"}, so they need ${ws.babyCount === 3 ? "three names" : "two names"} that work together.`}
         </p>
       </header>
-      <SuggestForm slug={slug} babyLabel={ws.babyLabel} />
+      <SuggestForm slug={slug} babyLabel={babiesLabel(ws.babyLabel, ws.babyCount)} />
       <p className="mt-6 text-center text-xs text-ink-soft">
         Your suggestion is private to the parents. No account needed.
       </p>

@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { WorkspaceState } from "@/lib/workspace";
 import { seatLabel, DEFAULT_PARTNER_NAME } from "@/lib/seat";
+import { babiesLabel, slotLabel, slots } from "@/lib/babies";
 import NameYourself from "./NameYourself";
 import JourneyDetails from "./JourneyDetails";
 import ChatPanel from "./ChatPanel";
 import ShortlistPanel from "./ShortlistPanel";
 import SignOutButton from "./SignOutButton";
+import KeepsakeUpsell from "./KeepsakeUpsell";
 
 type Me = { id: string; name: string; color: string };
 
@@ -32,7 +34,7 @@ export default function Dashboard({
   const [details, setDetails] = useState(false);
   const [decideOpen, setDecideOpen] = useState<string | null>(null); // preselected nameId
   const [mobileTab, setMobileTab] = useState<"chat" | "list">("chat");
-  const [reveal, setReveal] = useState(false);
+  const [reveal, setReveal] = useState<number | null>(null); // the slot just named
 
   const refresh = useCallback(async () => {
     const res = await fetch(`/api/workspaces/${ws.id}`);
@@ -52,7 +54,11 @@ export default function Dashboard({
   // "Decide together" is a promise about two people. Somebody doing this alone
   // shouldn't be told to agree with an empty chair.
   const together = ws.members.filter((m) => m.joined).length > 1;
-  const chosen = ws.names.find((n) => n.id === ws.chosenNameId);
+  // With twins the decision happens twice, so what matters isn't "have they
+  // decided" but "who is still waiting".
+  const waiting = slots(ws.babyCount).filter((s) => !ws.chosen.some((c) => c.slot === s));
+  const partly = ws.chosen.length > 0 && waiting.length > 0;
+  const babies = babiesLabel(ws.babyLabel, ws.babyCount);
   // The one unclaimed seat is the only source of an invite link. It used to
   // fall back to the token in the URL, which meant that reloading an old
   // ?invite= link kept showing a way in after the seat was taken. A journey
@@ -76,7 +82,7 @@ export default function Dashboard({
             className="hidden items-center gap-2 rounded-full px-2 py-1 text-sm text-ink-soft transition hover:bg-card sm:flex"
           >
             <span>Naming</span>
-            <span className="font-display text-base text-ink">{ws.babyLabel}</span>
+            <span className="font-display text-base text-ink">{babies}</span>
             {ws.lastName && <span>· {ws.lastName}</span>}
             <span aria-hidden className="text-xs text-pewter-light">✎</span>
           </button>
@@ -107,7 +113,11 @@ export default function Dashboard({
                 onClick={() => setDecideOpen("")}
                 className="rounded-full bg-sage-deep px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-pewter"
               >
-                {together ? "Decide together" : "Decide"}
+                {partly
+                  ? `Name ${slotLabel(waiting[0])}`
+                  : together
+                    ? "Decide together"
+                    : "Decide"}
               </button>
             )}
           </div>
@@ -122,9 +132,18 @@ export default function Dashboard({
 
       <WindowBanner ws={ws} />
 
-      {decided && chosen && (
-        <DecidedBanner ws={ws} chosen={chosen} onReopen={refresh} origin={origin} />
+      {decided && ws.chosen.length > 0 && (
+        <DecidedBanner ws={ws} origin={origin} onChanged={refresh} />
       )}
+
+      {/* The decision moment is peak emotion — the one place a made-to-order
+          keepsake sells itself. With twins it's two. */}
+      {decided && ws.chosen.length > 0 && <KeepsakeUpsell ws={ws} />}
+
+      {/* Half-named. The one thing that has to stay in front of them from here
+          on: who already has a name, so every name still being weighed is
+          weighed beside it. */}
+      {partly && <PartlyNamedBanner ws={ws} waiting={waiting} onName={() => setDecideOpen("")} onChanged={refresh} />}
 
       {/* Mobile segmented control */}
       <div className="mx-auto w-full max-w-7xl px-5 pt-4 lg:hidden">
@@ -145,7 +164,7 @@ export default function Dashboard({
           onClick={() => setDetails(true)}
           className="mt-2 w-full text-center text-xs text-ink-soft underline underline-offset-2"
         >
-          Edit {ws.babyLabel}&apos;s details
+          Edit {ws.babyCount > 1 ? "your" : `${ws.babyLabel}'s`} details
         </button>
       </div>
 
@@ -181,45 +200,59 @@ export default function Dashboard({
         <DecideModal
           ws={ws}
           preselect={decideOpen}
+          waiting={waiting}
           onClose={() => setDecideOpen(null)}
-          onDecided={async () => {
+          onDecided={async (slot) => {
             setDecideOpen(null);
             await refresh();
-            setReveal(true);
+            setReveal(slot);
           }}
         />
       )}
-      {reveal && chosen && <RevealOverlay name={chosen} onClose={() => setReveal(false)} />}
+      {reveal !== null && ws.chosen.some((c) => c.slot === reveal) && (
+        <RevealOverlay ws={ws} slot={reveal} onClose={() => setReveal(null)} />
+      )}
     </div>
   );
 }
 
-/* Full-screen emotional reveal the moment a name is chosen. */
-function RevealOverlay({
-  name,
-  onClose,
-}: {
-  name: WorkspaceState["names"][number];
-  onClose: () => void;
-}) {
-  const full = [name.firstName, name.middleName, name.lastName].filter(Boolean).join(" ");
+/* Full-screen emotional reveal the moment a name is chosen. With twins it
+   happens once per baby: the first is a milestone worth stopping for, and
+   pretending it's the finale would be a lie about what's left to do. */
+function RevealOverlay({ ws, slot, onClose }: { ws: WorkspaceState; slot: number; onClose: () => void }) {
+  const just = ws.chosen.find((c) => c.slot === slot)!;
+  const others = ws.chosen.filter((c) => c.slot !== slot);
+  const left = ws.babyCount - ws.chosen.length;
   return (
     <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center overflow-hidden bg-[#fdf6e6] px-6 text-center">
       <Confetti />
       <div className="animate-rise relative">
-        <div className="font-display text-sm uppercase tracking-[0.35em] text-gold">Your baby&apos;s name is</div>
-        <h1 className="mt-6 font-display text-6xl leading-tight text-pewter sm:text-8xl">{full}</h1>
+        <div className="font-display text-sm uppercase tracking-[0.35em] text-gold">
+          {ws.babyCount > 1 ? `${just.label}'s name is` : "Your baby's name is"}
+        </div>
+        <h1 className="mt-6 font-display text-6xl leading-tight text-pewter sm:text-8xl">
+          {just.fullName}
+        </h1>
         <div className="mx-auto my-8 flex items-center justify-center gap-3 text-gold">
           <span className="h-px w-16 bg-gold/50" />
           <span className="text-xl">✦</span>
           <span className="h-px w-16 bg-gold/50" />
         </div>
-        <p className="text-lg text-ink-soft">Congratulations. What a beautiful choice.</p>
+        {others.length > 0 && (
+          <p className="mb-3 font-display text-2xl text-pewter">
+            alongside {others.map((c) => c.fullName).join(" and ")}
+          </p>
+        )}
+        <p className="text-lg text-ink-soft">
+          {left > 0
+            ? `Congratulations — one name found. ${left === 1 ? "One" : String(left)} more to go, and from here every name gets weighed beside ${just.firstName}.`
+            : "Congratulations. What a beautiful choice."}
+        </p>
         <button
           onClick={onClose}
           className="mt-8 rounded-full bg-gold px-8 py-3 font-display text-lg text-white transition hover:brightness-95"
         >
-          Continue
+          {left > 0 ? "Keep going" : "Continue"}
         </button>
       </div>
     </div>
@@ -230,23 +263,28 @@ function RevealOverlay({
 
 function DecidedBanner({
   ws,
-  chosen,
-  onReopen,
   origin,
+  onChanged,
 }: {
   ws: WorkspaceState;
-  chosen: WorkspaceState["names"][number];
-  onReopen: () => void;
   origin: string;
+  onChanged: () => void;
 }) {
-  const full = [chosen.firstName, chosen.middleName, chosen.lastName].filter(Boolean).join(" ");
+  const many = ws.chosen.length > 1;
   return (
     <div className="relative overflow-hidden border-b border-gold/40 bg-[#fdf6e6]">
       <Confetti />
       <div className="relative mx-auto max-w-7xl px-5 py-6 text-center">
-        <div className="text-xs uppercase tracking-widest text-[#8a6d1f]">You chose a name</div>
-        <div className="font-display text-4xl text-pewter sm:text-5xl">{full}</div>
-        {ws.decidedReason && <p className="mx-auto mt-2 max-w-2xl text-ink-soft">“{ws.decidedReason}”</p>}
+        <div className="text-xs uppercase tracking-widest text-[#8a6d1f]">
+          You chose {many ? "their names" : "a name"}
+        </div>
+        {ws.chosen.map((c) => (
+          <div key={c.slot} className={many ? "mt-2" : ""}>
+            {many && <div className="text-xs uppercase tracking-widest text-[#8a6d1f]/70">{c.label}</div>}
+            <div className="font-display text-4xl text-pewter sm:text-5xl">{c.fullName}</div>
+            {c.reason && <p className="mx-auto mt-1 max-w-2xl text-ink-soft">“{c.reason}”</p>}
+          </div>
+        ))}
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <Link
             href={`/w/${ws.id}/keepsake`}
@@ -260,10 +298,91 @@ function DecidedBanner({
           >
             Copy keepsake link
           </button>
-          <button onClick={onReopen} className="rounded-full px-4 py-2.5 text-sm text-ink-soft hover:text-pewter">
+          {/* Nothing is final until the birth certificate. Reopening puts the
+              name (or names) back on the shortlist rather than pretending the
+              decision can't be revisited. */}
+          <button
+            onClick={async () => {
+              await fetch("/api/decide", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ workspaceId: ws.id }),
+              });
+              onChanged();
+            }}
+            className="rounded-full px-4 py-2.5 text-sm text-ink-soft hover:text-pewter"
+          >
             Keep exploring
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/// One twin named, one still to go.
+///
+/// This is the state the whole multiples feature exists for, so it's a
+/// permanent band across the top rather than a message that scrolls away: the
+/// name they've settled on has to be in front of them while they weigh the
+/// next one, because that's now the thing every remaining name is judged
+/// against.
+function PartlyNamedBanner({
+  ws,
+  waiting,
+  onName,
+  onChanged,
+}: {
+  ws: WorkspaceState;
+  waiting: number[];
+  onName: () => void;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  async function undo(nameId: string) {
+    setBusy(true);
+    await fetch("/api/decide", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId: ws.id, nameId }),
+    });
+    onChanged();
+    setBusy(false);
+  }
+
+  return (
+    <div className="border-b border-gold/40 bg-[#fdf6e6]/70">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          {ws.chosen.map((c) => (
+            <span key={c.slot} className="flex items-baseline gap-1.5">
+              <span className="text-xs uppercase tracking-widest text-[#8a6d1f]">{c.label}</span>
+              <span className="font-display text-xl text-pewter">{c.fullName}</span>
+              <span className="text-gold">✦</span>
+              <button
+                onClick={() => undo(c.nameId)}
+                disabled={busy || ws.expired}
+                className="text-xs text-ink-soft underline underline-offset-2 transition hover:text-pewter disabled:opacity-50"
+              >
+                change
+              </button>
+            </span>
+          ))}
+          <span className="text-ink-soft">
+            {waiting.length === 1 ? "One name left" : `${waiting.length} names left`} — everything
+            from here is weighed beside{" "}
+            {ws.chosen.map((c) => c.firstName).join(" and ")}.
+          </span>
+        </div>
+        {!ws.expired && (
+          <button
+            onClick={onName}
+            className="shrink-0 rounded-full bg-gold px-4 py-1.5 text-sm font-semibold text-white transition hover:brightness-95"
+          >
+            Name {slotLabel(waiting[0])}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -539,18 +658,41 @@ function InviteByEmail({ ws }: { ws: WorkspaceState }) {
 function DecideModal({
   ws,
   preselect,
+  waiting,
   onClose,
   onDecided,
 }: {
   ws: WorkspaceState;
   preselect: string;
+  /// The babies still without a name, in order.
+  waiting: number[];
   onClose: () => void;
-  onDecided: () => void;
+  onDecided: (slot: number) => void;
 }) {
-  const options = ws.names.filter((n) => !n.ratings.some((r) => r.veto));
+  // A name already given to one baby can't be given to the other as well.
+  const options = ws.names.filter(
+    (n) => n.role !== "middle" && !n.ratings.some((r) => r.veto) && n.chosenSlot === null,
+  );
+  const middles = ws.names.filter(
+    (n) => n.role === "middle" && !n.ratings.some((r) => r.veto),
+  );
   const [nameId, setNameId] = useState(preselect || options[0]?.id || "");
-  const [reason, setReason] = useState(ws.decidedReason || "");
+  const [slot, setSlot] = useState(waiting[0] ?? 1);
+  const [middleId, setMiddleId] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const multiple = ws.babyCount > 1;
+  const chosenName = options.find((n) => n.id === nameId);
+  // What they'd actually be writing on the certificate. The middle from the
+  // list wins; otherwise whatever was typed inline beside the first name.
+  const middleWord = middles.find((m) => m.id === middleId)?.firstName ?? chosenName?.middleName;
+  const fullName = chosenName
+    ? [chosenName.firstName, middleWord, chosenName.lastName].filter(Boolean).join(" ")
+    : "";
+  // The pair check, right where the decision is made: whatever the shortlist
+  // noticed about this name beside its sibling, said once more before they
+  // commit to it.
+  const pairChecks = chosenName?.checks.filter((c) => c.pair) ?? [];
 
   async function confirm() {
     if (!nameId) return;
@@ -558,17 +700,52 @@ function DecideModal({
     await fetch("/api/decide", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId: ws.id, nameId, reason: reason.trim() || undefined }),
+      body: JSON.stringify({
+        workspaceId: ws.id,
+        nameId,
+        slot,
+        middleId,
+        reason: reason.trim() || undefined,
+      }),
     });
-    onDecided();
+    onDecided(slot);
   }
 
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-display text-2xl text-ink">Choosing your name</h2>
+      <h2 className="font-display text-2xl text-ink">
+        {multiple ? `Naming ${slotLabel(slot)}` : "Choosing your name"}
+      </h2>
       <p className="mt-1 text-sm text-ink-soft">
-        A beautiful moment. Pick the one, and tell the story of why — it becomes your keepsake.
+        {multiple
+          ? "One at a time. Pick this baby's name and tell the story of why — each of them gets their own on the keepsake."
+          : "A beautiful moment. Pick the one, and tell the story of why — it becomes your keepsake."}
       </p>
+
+      {multiple && waiting.length > 1 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {waiting.map((s) => (
+            <button
+              key={s}
+              onClick={() => setSlot(s)}
+              className={`rounded-full border px-3.5 py-1.5 text-sm transition ${
+                slot === s
+                  ? "border-sage-deep bg-sage-deep text-white"
+                  : "border-line bg-paper text-ink-soft hover:border-sage"
+              }`}
+            >
+              {slotLabel(s)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {ws.chosen.length > 0 && (
+        <p className="mt-3 rounded-xl bg-butter-soft/70 px-3 py-2 text-xs leading-relaxed text-[#8a6d1f]">
+          {ws.chosen.map((c) => `${c.label} is ${c.fullName}`).join(" · ")} — say this one out loud
+          beside {ws.chosen.length > 1 ? "them" : "it"} before you decide.
+        </p>
+      )}
 
       {options.length === 0 ? (
         <p className="mt-4 rounded-xl bg-paper-2/60 p-4 text-sm text-ink-soft">
@@ -593,11 +770,89 @@ function DecideModal({
               );
             })}
           </div>
+
+          {/* The middle name, chosen with the first rather than after it —
+              this is the moment the full name comes into being, and it's the
+              only moment it can be read aloud in one piece. */}
+          {middles.length > 0 && (
+            <div className="mt-4">
+              <div className="mb-1.5 text-sm font-semibold text-ink">
+                And the middle name <span className="font-normal text-ink-soft">optional</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {middles.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setMiddleId(middleId === m.id ? null : m.id)}
+                    className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                      middleId === m.id
+                        ? "border-gold bg-gold text-white"
+                        : "border-line bg-paper text-ink-soft hover:border-sage"
+                    }`}
+                  >
+                    {m.firstName}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setMiddleId(null)}
+                  className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                    middleId === null
+                      ? "border-sage-deep bg-sage-deep text-white"
+                      : "border-line bg-paper text-ink-soft hover:border-sage"
+                  }`}
+                >
+                  {chosenName?.middleName ? `Keep ${chosenName.middleName}` : "No middle name"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {middles.length === 0 && (
+            <p className="mt-3 text-xs leading-relaxed text-ink-soft">
+              Middle names have a list of their own on your shortlist — add a few there and you
+              can pick one here.
+            </p>
+          )}
+
+          {fullName && (
+            <p className="mt-4 text-center font-display text-2xl text-pewter">{fullName}</p>
+          )}
+
+          {/* Whatever the shortlist noticed about this name beside its
+              sibling's, said once more at the moment it matters. */}
+          {pairChecks.length > 0 && (
+            <ul className="mt-3 space-y-1.5 rounded-xl bg-paper-2/60 px-3 py-2.5">
+              {pairChecks.map((c, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs leading-snug text-ink-soft">
+                  <span
+                    className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                      c.level === "watch" ? "bg-gold" : "bg-sage"
+                    }`}
+                  />
+                  <span>
+                    <span
+                      className={`font-semibold ${
+                        c.level === "watch" ? "text-[#8a6d1f]" : "text-sage-deep"
+                      }`}
+                    >
+                      {c.title}.
+                    </span>{" "}
+                    {c.detail}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={3}
-            placeholder="Why this name? (the meaning, the story, the feeling…)"
+            placeholder={
+              multiple
+                ? `Why this name for ${slotLabel(slot)}? (the meaning, the story, the feeling…)`
+                : "Why this name? (the meaning, the story, the feeling…)"
+            }
             className="mt-4 w-full resize-none rounded-xl border border-line bg-paper px-3 py-2.5 text-sm outline-none focus:border-sage"
           />
           <div className="mt-5 flex gap-2">

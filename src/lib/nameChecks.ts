@@ -8,6 +8,9 @@ export type NameCheck = {
   level: CheckLevel;
   title: string;
   detail: string;
+  /// True when this is about how the name sits beside a sibling's, rather than
+  /// about the name itself — so the decision screen can repeat just those.
+  pair?: boolean;
 };
 
 // Short letter-combos that tend to invite teasing on a monogram / initials.
@@ -53,7 +56,17 @@ export type NamePieces = {
   lastName?: string | null;
 };
 
-export function analyzeName({ firstName, middleName, lastName }: NamePieces): NameCheck[] {
+/// A name already chosen for one of the other babies in this journey, and what
+/// that baby is called while we wait for it. Only ever set for twins and
+/// triplets — a single baby has nobody to be compared with.
+export type Sibling = NamePieces & { label: string };
+
+export function analyzeName(
+  { firstName, middleName, lastName }: NamePieces,
+  /// Names already spoken for. Once one twin is named, every remaining name is
+  /// really being judged as half of a pair, so the pair gets checked too.
+  siblings: Sibling[] = [],
+): NameCheck[] {
   const checks: NameCheck[] = [];
   const first = (firstName || "").trim();
   const middle = (middleName || "").trim();
@@ -91,7 +104,7 @@ export function analyzeName({ firstName, middleName, lastName }: NamePieces): Na
       title: "Add your surname for the full picture",
       detail: "Set your family surname in the workspace and I'll also check how the whole name flows and what it monograms to.",
     });
-    return checks;
+    return [...checks, ...siblingChecks({ firstName: first, middleName: middle }, siblings)];
   }
 
   // --- First + surname flow ---
@@ -132,6 +145,34 @@ export function analyzeName({ firstName, middleName, lastName }: NamePieces): Na
     });
   }
 
+  // --- The middle name, in its place ---
+  //
+  // A middle name is only ever heard between two others, so the only useful
+  // things to say about it are about the joins either side.
+  if (middle) {
+    const mStart = middle[0].toLowerCase();
+    const mEnd = middle.slice(-1).toLowerCase();
+    if (endRhyme(middle, first) || endRhyme(middle, last)) {
+      checks.push({
+        level: "watch",
+        title: `${middle} rhymes with ${endRhyme(middle, first) ? first : last}`,
+        detail: `Said in full — "${first} ${middle} ${last}" — two of the three names chime. Middle names are usually said out loud only when someone's in trouble, so it matters less than it looks. Worth hearing once.`,
+      });
+    } else if (fEnd === mStart || mEnd === lStart) {
+      checks.push({
+        level: "info",
+        title: "The middle name runs into its neighbour",
+        detail: `"${first} ${middle} ${last}" butts two matching sounds together. It usually smooths out in speech — say it once, quickly, and see.`,
+      });
+    } else {
+      checks.push({
+        level: "delight",
+        title: `"${first} ${middle} ${last}" reads well`,
+        detail: `The three names sit apart cleanly — nothing collides, nothing chimes. The full name is the one on the certificate, so it's worth this much attention.`,
+      });
+    }
+  }
+
   // --- Full-name length ---
   const full = [first, middle, last].filter(Boolean).join(" ");
   if (full.length >= 24) {
@@ -140,6 +181,108 @@ export function analyzeName({ firstName, middleName, lastName }: NamePieces): Na
       title: "A long full name to write out",
       detail: `"${full}" is on the longer side — think tiny forms, name tags, and a small hand learning to sign it. No problem, just a heads-up.`,
     });
+  }
+
+  return [...checks, ...siblingChecks({ firstName: first, middleName: middle, lastName: last }, siblings)];
+}
+
+/* ------------------------------------------------ how a pair sits together */
+
+// Are two names near-twins themselves? Either a letter apart, or sharing
+// enough of a beginning that a teacher will say the wrong one for a year.
+function nearlyTheSame(a: string, b: string): boolean {
+  if (editDistance(a, b) <= 1) return true;
+  let shared = 0;
+  while (shared < a.length && shared < b.length && a[shared] === b[shared]) shared++;
+  return shared >= 3 && Math.abs(a.length - b.length) <= 2;
+}
+
+function editDistance(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) {
+      row[j] = Math.min(
+        prev[j] + 1,
+        row[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+/// How a name sounds beside the ones their brother or sister already has.
+///
+/// The same spirit as the monogram check, and for the same reason: twins are
+/// called across a room together for eighteen years, so the pair is a real
+/// thing to look at and not a detail. Never a verdict — a rhyming pair is a
+/// delight to plenty of families. It should just be on purpose.
+function siblingChecks(name: NamePieces, siblings: Sibling[]): NameCheck[] {
+  const checks: NameCheck[] = [];
+  const first = (name.firstName || "").trim();
+  if (!first) return checks;
+
+  for (const sib of siblings) {
+    const other = (sib.firstName || "").trim();
+    if (!other) continue;
+    const a = first.toLowerCase();
+    const b = other.toLowerCase();
+    const pair = `${other} and ${first}`;
+
+    if (a === b) {
+      checks.push({
+        pair: true,
+        level: "watch",
+        title: `That's ${sib.label}'s name`,
+        detail: `${sib.label} is already ${other}. Two children with one name between them is a lot to carry — unless you mean it as a middle name for both.`,
+      });
+      continue;
+    }
+
+    if (endRhyme(first, other)) {
+      checks.push({
+        pair: true,
+        level: "watch",
+        title: `${pair} rhyme`,
+        detail: `Said together — and they will be said together, constantly — "${pair}" rhymes. Some families adore that; others find it hard to shake. Worth calling them both out loud across a room before you decide.`,
+      });
+    } else if (nearlyTheSame(a, b)) {
+      checks.push({
+        pair: true,
+        level: "watch",
+        title: `${pair} are easy to muddle`,
+        detail: `"${other}" and "${first}" are close enough that teachers, relatives, and eventually the two of them will mix them up. Lovely on paper, tiring at the school gate.`,
+      });
+    } else if (a[0] === b[0]) {
+      checks.push({
+        pair: true,
+        level: "info",
+        title: `Both begin with ${a[0].toUpperCase()}`,
+        detail: `${pair} share an initial. Plenty of families love a matched set; others find it a lifetime of opened post. Either is fine — as long as it's a choice.`,
+      });
+    } else {
+      checks.push({
+        pair: true,
+        level: "info",
+        title: `Said together: ${pair}`,
+        detail: `Nothing awkward in the pair — different sounds, different shape. Say them out loud one after the other and see how they land.`,
+      });
+    }
+
+    // Independent of how they sound: two children who monogram to the same
+    // three letters share every towel, satchel, and engraved cup they own.
+    const mine = initialsOf([first, name.middleName ?? "", name.lastName ?? ""]);
+    const theirs = initialsOf([other, sib.middleName ?? "", sib.lastName ?? ""]);
+    if (mine.length >= 2 && mine === theirs) {
+      checks.push({
+        pair: true,
+        level: "watch",
+        title: `They'd share the monogram ${mine}`,
+        detail: `${pair} would both initial to ${mine} — one set of letters on two of everything. Changing one middle name is usually all it takes, if that matters to you.`,
+      });
+    }
   }
 
   return checks;

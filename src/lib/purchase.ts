@@ -17,7 +17,7 @@ import {
   type AccessWindow,
 } from "@/lib/pricing";
 import { getStripe } from "@/lib/stripe";
-import { sendJourneyReadyLink, sendGiftLink, sendBoxOnItsWay } from "@/lib/email";
+import { sendJourneyReadyLink, sendGiftLink, sendBoxOnItsWay, sendKeepsakeOrdered } from "@/lib/email";
 
 // Namesake — the money path.
 //
@@ -141,6 +141,46 @@ export async function createPurchase(input: NewGiftOrJourney) {
   });
 }
 
+/// A comped gift — access granted free, for feedback or as a present from the
+/// makers. To a recipient it's an ordinary gift: they open a link, sign in, and
+/// describe their journey. But it's born already `paid`, so it never touches
+/// checkout — no card, real or fake. It grants only the journey; the dropship
+/// keepsake upsell still waits for them at the end, at full price.
+export async function createCompGift(input: {
+  createdByEmail: string;
+  fromName?: string;
+  message?: string;
+  months?: number;
+}) {
+  const months = input.months && input.months > 0 ? input.months : 6;
+  return db.purchase.create({
+    data: {
+      tier: "comp",
+      kind: "gift",
+      expiryRule: "months",
+      months,
+      graceDays: null,
+      fallbackMonths: null,
+      amountCents: 0,
+      currency: "usd",
+      purchaserEmail: normalizeEmail(input.createdByEmail),
+      purchaserName: input.fromName?.trim() || "Someone who loves you",
+      giftMessage: input.message?.trim() || null,
+      // The whole point: granted the moment it's made, so redemption is all
+      // that's left.
+      status: "paid",
+      paidAt: new Date(),
+      needsShipping: false,
+      redeemCode: redeemCode(),
+      suggestSlug: reserveSuggestSlug(),
+      items: {
+        create: [{ sku: "comp", name: "Namesake journey (gift)", amountCents: 0, physical: false }],
+      },
+    },
+    include: { items: true },
+  });
+}
+
 export async function createExtension(workspaceId: string, purchaserEmail: string, name?: string) {
   return db.purchase.create({
     data: {
@@ -163,6 +203,55 @@ export async function createExtension(workspaceId: string, purchaserEmail: strin
           },
         ],
       },
+    },
+    include: { items: true },
+  });
+}
+
+/// A keepsake bought after the name is chosen, tied to the journey it belongs
+/// to. It grants no time — it's an order to make and ship a personalized
+/// object — so the name is written onto the line item itself, which is exactly
+/// what the packing list reads. Twins are simply two lines, one per baby, which
+/// is where the second sale comes from.
+export async function createKeepsakeOrder(input: {
+  workspaceId: string;
+  purchaserEmail: string;
+  purchaserName?: string;
+  lines: { addOn: AddOnId; personalization?: string | null }[];
+}) {
+  const items = input.lines
+    .map(({ addOn, personalization }) => {
+      const a = ADD_ONS[addOn];
+      if (!a) return null;
+      return {
+        sku: a.id,
+        // The name rides on the item so it appears on both the Stripe receipt
+        // and the fulfillment packing list — no separate field to keep in sync.
+        name: personalization ? `${a.name} · ${personalization}` : a.name,
+        amountCents: a.amountCents,
+        physical: a.physical,
+        shipsAfterNaming: Boolean(a.shipsAfterNaming),
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  if (items.length === 0) return null;
+
+  const amountCents = items.reduce((sum, i) => sum + i.amountCents, 0);
+  return db.purchase.create({
+    data: {
+      tier: "keepsake",
+      kind: "keepsake",
+      expiryRule: "months",
+      months: null,
+      amountCents,
+      currency: "usd",
+      purchaserEmail: normalizeEmail(input.purchaserEmail),
+      purchaserName: input.purchaserName?.trim() || null,
+      workspaceId: input.workspaceId,
+      needsShipping: true,
+      redeemCode: redeemCode(),
+      items: { create: items },
     },
     include: { items: true },
   });
@@ -215,9 +304,13 @@ export async function startCheckout(purchaseId: string, origin: string) {
     success_url:
       purchase.kind === "extend"
         ? `${origin}/w/${purchase.workspaceId}?extended=1`
-        : `${origin}/redeem/${purchase.redeemCode}`,
+        : purchase.kind === "keepsake"
+          ? `${origin}/w/${purchase.workspaceId}?keepsake=thanks`
+          : `${origin}/redeem/${purchase.redeemCode}`,
     cancel_url:
-      purchase.kind === "extend" ? `${origin}/w/${purchase.workspaceId}` : `${origin}/?cancelled=1`,
+      purchase.kind === "extend" || purchase.kind === "keepsake"
+        ? `${origin}/w/${purchase.workspaceId}`
+        : `${origin}/?cancelled=1`,
   });
 
   if (!session.url) return { ok: false as const, error: "Stripe didn't return a checkout URL." };
@@ -302,7 +395,14 @@ export async function fulfillPurchase(args: {
   const purchase = outcome.purchase;
   const redeemUrl = `${args.origin}/redeem/${purchase.redeemCode}`;
 
-  if (purchase.kind === "gift") {
+  if (purchase.kind === "keepsake") {
+    // No link to redeem — it's already tied to their journey. Just a warm
+    // confirmation that a made thing is coming.
+    await sendKeepsakeOrdered(
+      purchase.purchaserEmail,
+      `${args.origin}/w/${purchase.workspaceId}/keepsake`,
+    ).catch((err) => console.error("[namesake] keepsake email failed", err));
+  } else if (purchase.kind === "gift") {
     if (purchase.recipientEmail) {
       await sendGiftLink(
         purchase.recipientEmail,
@@ -347,7 +447,11 @@ export async function redeemPurchase(
   details?: unknown,
 ): Promise<RedeemPurchaseResult> {
   const purchase = await db.purchase.findUnique({ where: { redeemCode: code } });
-  if (!purchase || purchase.kind === "extend") return { ok: false, reason: "invalid" };
+  // Only journeys and gifts become workspaces. An extension or a keepsake is
+  // tied to an existing journey and has nothing to redeem.
+  if (!purchase || purchase.kind === "extend" || purchase.kind === "keepsake") {
+    return { ok: false, reason: "invalid" };
+  }
   if (purchase.status === "redeemed") return { ok: false, reason: "spent" };
   if (purchase.status !== "paid") return { ok: false, reason: "unpaid" };
 

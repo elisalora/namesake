@@ -4,6 +4,7 @@ import { getWritableMember } from "@/lib/session";
 import { streamConsultant, extractSuggestions, type ConsultantContext, type ChatTurn } from "@/lib/consultant";
 import { openingMessage } from "@/lib/opening";
 import { namedParents } from "@/lib/seat";
+import { babiesLabel, slotLabel, slots } from "@/lib/babies";
 
 const schema = z.object({
   workspaceId: z.string(),
@@ -25,6 +26,22 @@ export async function POST(request: Request) {
   }
   const member = access.member;
 
+  // Per-journey usage cap — a backstop so the cheap tiers stay profitable
+  // against a rare power-user. Generous enough that a normal couple never
+  // meets it; the reply is warm, not a wall.
+  const cap = Number.parseInt(process.env.NAMESAKE_MSG_CAP || "120", 10);
+  if (Number.isFinite(cap) && cap > 0) {
+    const priorTurns = await db.chatMessage.count({ where: { workspaceId, role: "user" } });
+    if (priorTurns >= cap) {
+      return new Response(
+        "We've talked through so much together — more than enough to trust what you're drawn to. " +
+          "I'll always be here to read back over, but the deciding part is yours now, and I think you're closer than you feel. " +
+          "Sit with your shortlist for a day; the right one tends to get quietly louder.",
+        { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } },
+      );
+    }
+  }
+
   // Assemble the couple's current context for the consultant.
   const ws = await db.workspace.findUnique({
     where: { id: workspaceId },
@@ -42,26 +59,64 @@ export async function POST(request: Request) {
   });
   if (!ws) return new Response("not_found", { status: 404 });
 
+  // Babies who already have a name, and the ones still waiting. With twins
+  // this is the whole shape of the conversation from the first decision on —
+  // so it's fetched on its own rather than picked out of the shortlist above,
+  // which is capped and could drop the one fact that matters most.
+  const chosen = await db.nameEntry.findMany({
+    where: { workspaceId, chosenSlot: { not: null } },
+    orderBy: { chosenSlot: "asc" },
+  });
+  const chosenMiddles = new Map(
+    chosen.filter((n) => n.role === "middle").map((n) => [n.chosenSlot!, n.firstName]),
+  );
+  const named = chosen
+    .filter((n) => n.role !== "middle")
+    .map((n) => ({
+      slot: n.chosenSlot!,
+      label: slotLabel(n.chosenSlot!),
+      fullName: [n.firstName, chosenMiddles.get(n.chosenSlot!) ?? n.middleName, n.lastName ?? ws.lastName]
+        .filter(Boolean)
+        .join(" "),
+    }));
+
   const ctx: ConsultantContext = {
-    babyLabel: ws.babyLabel,
+    babyLabel: babiesLabel(ws.babyLabel, ws.babyCount),
     lastName: ws.lastName,
+    babyCount: ws.babyCount,
+    named: named.map(({ label, fullName }) => ({ label, fullName })),
+    waiting: slots(ws.babyCount)
+      .filter((s) => !named.some((n) => n.slot === s))
+      .map(slotLabel),
     expecting: ws.expecting,
     // The panel paints an opening before anyone types. It goes in the system
     // prompt rather than the message list: a conversation has to begin with a
     // user turn, and leading with an assistant message is rejected on some
     // models — which broke every first message.
-    opening: openingMessage({ babyLabel: ws.babyLabel, parents: namedParents(ws.members) }),
+    opening: openingMessage({
+      babyLabel: babiesLabel(ws.babyLabel, ws.babyCount),
+      parents: namedParents(ws.members),
+      babyCount: ws.babyCount,
+    }),
     // Only people who are actually here. An unclaimed seat would otherwise
     // have the consultant addressing "Ada and Partner", or asking how the two
     // of them feel, to someone doing this on their own.
     members: ws.members.filter((m) => m.userId).map((m) => ({ name: m.name })),
-    shortlist: ws.names.map((n) => ({
-      firstName: n.firstName,
-      middleName: n.middleName,
-      status: n.status,
-      ratings: n.ratings.map((r) => ({ member: r.member.name, score: r.score, veto: r.veto })),
-      note: n.comments[0]?.body ?? null,
-    })),
+    shortlist: ws.names
+      .filter((n) => n.role !== "middle")
+      .map((n) => ({
+        firstName: n.firstName,
+        middleName: n.middleName,
+        status: n.status,
+        ratings: n.ratings.map((r) => ({ member: r.member.name, score: r.score, veto: r.veto })),
+        note: n.comments[0]?.body ?? null,
+      })),
+    middleShortlist: ws.names
+      .filter((n) => n.role === "middle")
+      .map((n) => ({
+        name: n.firstName,
+        ratings: n.ratings.map((r) => ({ member: r.member.name, score: r.score, veto: r.veto })),
+      })),
     newSuggestions: ws.suggestions.map((s) => ({
       name: s.suggestedName,
       from: s.suggesterName,

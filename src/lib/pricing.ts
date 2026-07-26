@@ -9,7 +9,7 @@
 // drift out of sync with this file — and each is env-overridable.
 
 export type TierId = "sprout" | "bloom" | "whole_journey" | "self_serve";
-export type AddOnId = "rattle" | "blanket" | "framed_print";
+export type AddOnId = "rattle" | "blanket" | "framed_print" | "announcement_cards" | "keepsake_set";
 
 /// How long a purchase grants.
 ///
@@ -61,8 +61,8 @@ export const TIERS: Record<TierId, Tier> = {
     name: "Sprout",
     tagline: "A month to choose",
     blurb:
-      "The whole thing, for a month. Enough to land on the name — and small enough that several of you can go in on it.",
-    amountCents: cents("NAMESAKE_PRICE_SPROUT_CENTS", 5900),
+      "The whole thing, for a month — priced so it's an easy yes, and so several of you can go in on it.",
+    amountCents: cents("NAMESAKE_PRICE_SPROUT_CENTS", 1000),
     currency: "usd",
     window: { rule: "months", months: 1 },
     physical: false,
@@ -71,10 +71,10 @@ export const TIERS: Record<TierId, Tier> = {
     id: "bloom",
     kind: "gift",
     name: "Bloom",
-    tagline: "Three months, in a box",
+    tagline: "The shower gift, in a box",
     blurb:
-      "The same thing, three months of it, arriving as something you can put in their hands at the shower.",
-    amountCents: cents("NAMESAKE_PRICE_BLOOM_CENTS", 10900),
+      "The same thing, three months of it, arriving as something you can put in their hands at the shower — bow and all.",
+    amountCents: cents("NAMESAKE_PRICE_BLOOM_CENTS", 6500),
     currency: "usd",
     window: { rule: "months", months: 3 },
     physical: true,
@@ -90,17 +90,13 @@ export const TIERS: Record<TierId, Tier> = {
     name: "The Whole Journey",
     tagline: "Until the baby arrives",
     blurb:
-      "The same box, lasting the rest of the pregnancy and a week past the due date — because babies keep their own schedules.",
-    amountCents: cents("NAMESAKE_PRICE_WHOLE_JOURNEY_CENTS", 15900),
+      "Everything, lasting the rest of the pregnancy and a week past the due date — because babies keep their own schedules.",
+    amountCents: cents("NAMESAKE_PRICE_WHOLE_JOURNEY_CENTS", 5000),
     currency: "usd",
     // Resolved when they redeem and tell us the due date; nine months if they
     // would rather not say.
     window: { rule: "due_date_grace", graceDays: 7, fallbackMonths: 9 },
-    physical: true,
-    boxContents: [
-      "A card in your own words, carrying the link that opens it",
-      "A second card for the gift table, so the room can suggest names",
-    ],
+    physical: false,
   },
   self_serve: {
     id: "self_serve",
@@ -109,7 +105,7 @@ export const TIERS: Record<TierId, Tier> = {
     tagline: "For the two of you",
     blurb:
       "Three months with the consultant, your shortlist, ideas from the people you love, and the keepsake at the end.",
-    amountCents: cents("NAMESAKE_PRICE_SELF_SERVE_CENTS", 4900),
+    amountCents: cents("NAMESAKE_PRICE_SELF_SERVE_CENTS", 2000),
     currency: "usd",
     window: { rule: "months", months: 3 },
     physical: false,
@@ -141,7 +137,7 @@ export const ADD_ONS: Record<AddOnId, AddOn> = {
     id: "blanket",
     name: "Embroidered blanket",
     blurb: "Soft cotton, embroidered with the name they choose.",
-    amountCents: cents("NAMESAKE_PRICE_BLANKET_CENTS", 5800),
+    amountCents: cents("NAMESAKE_PRICE_BLANKET_CENTS", 7500),
     physical: true,
     shipsAfterNaming: true,
   },
@@ -150,6 +146,22 @@ export const ADD_ONS: Record<AddOnId, AddOn> = {
     name: "Framed keepsake",
     blurb: "The name and the story behind it, printed and framed.",
     amountCents: cents("NAMESAKE_PRICE_FRAMED_PRINT_CENTS", 3000),
+    physical: true,
+    shipsAfterNaming: true,
+  },
+  announcement_cards: {
+    id: "announcement_cards",
+    name: "Announcement cards",
+    blurb: "A set of printed cards to share the name — ready to send once it's chosen.",
+    amountCents: cents("NAMESAKE_PRICE_ANNOUNCEMENT_CARDS_CENTS", 4500),
+    physical: true,
+    shipsAfterNaming: true,
+  },
+  keepsake_set: {
+    id: "keepsake_set",
+    name: "The keepsake set",
+    blurb: "The framed print, the embroidered blanket, and the cards — the whole set, together.",
+    amountCents: cents("NAMESAKE_PRICE_KEEPSAKE_SET_CENTS", 9500),
     physical: true,
     shipsAfterNaming: true,
   },

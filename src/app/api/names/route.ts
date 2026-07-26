@@ -5,6 +5,9 @@ import { getWritableMember, writeDenied } from "@/lib/session";
 
 const schema = z.object({
   workspaceId: z.string(),
+  /// A middle-name candidate is the same kind of thing as a first-name one,
+  /// weighed the same way. `firstName` holds the name either way.
+  role: z.enum(["first", "middle"]).optional(),
   firstName: z.string().trim().min(1).max(60),
   middleName: z.string().trim().max(60).optional(),
   lastName: z.string().trim().max(60).optional(),
@@ -29,8 +32,11 @@ export async function POST(request: Request) {
   const name = await db.nameEntry.create({
     data: {
       workspaceId: data.workspaceId,
+      role: data.role || "first",
       firstName: data.firstName,
-      middleName: data.middleName || null,
+      // A middle-name candidate is one word; anything typed after it belongs
+      // to the first name it'll sit beside, not to this entry.
+      middleName: (data.role === "middle" ? null : data.middleName) || null,
       lastName: data.lastName || null,
       gender: data.gender || null,
       origin: data.origin || null,

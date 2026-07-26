@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ExpectingChoice, { type Expecting } from "./ExpectingChoice";
+import MultiplesChoice from "./MultiplesChoice";
 
 type Props = {
   code: string;
@@ -39,6 +40,7 @@ export default function RedeemPanel({
     lastName: "",
     dueDate: "",
   });
+  const [babyCount, setBabyCount] = useState(1);
   const [expecting, setExpecting] = useState<Expecting | "">("");
 
   function set<K extends keyof typeof form>(k: K, v: string) {
@@ -79,6 +81,7 @@ export default function RedeemPanel({
                 partner: { name: form.partner.trim(), email: form.partnerEmail.trim() },
                 babyLabel: form.babyLabel.trim(),
                 lastName: form.lastName.trim(),
+                babyCount,
                 dueDate: form.dueDate || undefined,
                 expecting: expecting || undefined,
               }
@@ -95,7 +98,7 @@ export default function RedeemPanel({
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setBusy(false);
     }
-  }, [code, form, expecting, needsDetails, router, signedInAs]);
+  }, [code, form, babyCount, expecting, needsDetails, router, signedInAs]);
 
   if (waiting) {
     return (
@@ -156,11 +159,11 @@ export default function RedeemPanel({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field
-              label="What you call the bump"
+              label={babyCount > 1 ? "What you call them" : "What you call the bump"}
               hint="optional"
               value={form.babyLabel}
               onChange={(v) => set("babyLabel", v)}
-              placeholder="Peanut"
+              placeholder={babyCount > 1 ? "The Beans" : "Peanut"}
             />
             <Field
               label="Due date"
@@ -176,7 +179,14 @@ export default function RedeemPanel({
               today — you can always add more time later.
             </p>
           )}
-          <ExpectingChoice value={expecting} onChange={setExpecting} />
+          <MultiplesChoice
+            value={babyCount}
+            onChange={(n) => {
+              setBabyCount(n);
+              if (n === 1 && expecting === "mixed") setExpecting("");
+            }}
+          />
+          <ExpectingChoice value={expecting} onChange={setExpecting} babyCount={babyCount} />
         </div>
       ) : (
         <p className="mt-3 text-sm leading-relaxed text-ink-soft">

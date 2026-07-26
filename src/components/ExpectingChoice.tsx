@@ -4,9 +4,13 @@
 // who's chosen not to find out has made a decision about their pregnancy, and
 // the form shouldn't treat it as a blank.
 const OPTIONS = [
-  { value: "girl", label: "A girl", className: "text-mark-girl" },
-  { value: "boy", label: "A boy", className: "text-mark-boy" },
-  { value: "surprise", label: "It's a surprise", className: "text-mark-either" },
+  { value: "girl", label: "A girl", plural: "Girls", className: "text-mark-girl", min: 1 },
+  { value: "boy", label: "A boy", plural: "Boys", className: "text-mark-boy", min: 1 },
+  // Only exists once there's more than one baby — and for the couple expecting
+  // a boy and a girl it's the only true answer, so leaving it out would make
+  // them pick something wrong or nothing at all.
+  { value: "mixed", label: "One of each", plural: "One of each", className: "text-mark-either", min: 2 },
+  { value: "surprise", label: "It's a surprise", plural: "It's a surprise", className: "text-mark-either", min: 1 },
 ] as const;
 
 export type Expecting = (typeof OPTIONS)[number]["value"];
@@ -15,10 +19,13 @@ export default function ExpectingChoice({
   value,
   onChange,
   label = "Are you expecting…",
+  babyCount = 1,
 }: {
   value: Expecting | "";
   onChange: (v: Expecting | "") => void;
   label?: string;
+  /// Two babies make "a girl" read as a half-answer: it's two girls.
+  babyCount?: number;
 }) {
   return (
     <fieldset>
@@ -27,7 +34,7 @@ export default function ExpectingChoice({
         <span className="text-xs font-normal text-ink-soft">optional</span>
       </legend>
       <div className="flex flex-wrap gap-2">
-        {OPTIONS.map((o) => {
+        {OPTIONS.filter((o) => babyCount >= o.min).map((o) => {
           const on = value === o.value;
           return (
             <button
@@ -51,7 +58,7 @@ export default function ExpectingChoice({
               >
                 <path d="M12 21s-8-5-8-10.2A4.8 4.8 0 0 1 12 7a4.8 4.8 0 0 1 8 3.8C20 16 12 21 12 21z" />
               </svg>
-              {o.label}
+              {babyCount > 1 ? o.plural : o.label}
             </button>
           );
         })}
