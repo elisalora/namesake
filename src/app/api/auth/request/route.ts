@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { issueLoginLink, originFrom } from "@/lib/auth";
-import { sendSignInLink, sendInviteLink, emailIsLive } from "@/lib/email";
+import { sendSignInLink, sendInviteLink, emailFallsBackToConsole } from "@/lib/email";
 
 const schema = z.object({
   email: z.string().trim().email("That doesn't look like an email address."),
@@ -81,13 +81,14 @@ export async function POST(request: Request) {
   return NextResponse.json({ sent: true, email: link.email, devUrl: devUrl(link.url) });
 }
 
-/// With no mail provider configured we log the link instead, which is a
-/// deliberate development path rather than a failure. With one configured, a
-/// failed send is a real failure and must not be reported as success — there
-/// is no password to fall back on, so a swallowed error means a person simply
-/// cannot get in, and nobody finds out.
+/// In local development with no mail provider we log the link instead, which is
+/// a deliberate path rather than a failure. Everywhere else a failed send is a
+/// real failure and must not be reported as success — there is no password to
+/// fall back on, so a swallowed error means a person simply cannot get in, and
+/// nobody finds out. That includes a deployed box with no key at all, which is
+/// the same silence wearing a different hat.
 function deliverable(result: { delivered: boolean }) {
-  return result.delivered || !emailIsLive();
+  return result.delivered || emailFallsBackToConsole();
 }
 
 function undeliverable() {
@@ -98,7 +99,9 @@ function undeliverable() {
 }
 
 // Only ever populated in local development with no mail provider configured,
-// so the sign-in loop stays walkable without a Resend account.
+// so the sign-in loop stays walkable without a Resend account. The moment a key
+// is set this returns nothing and sign-in goes through the inbox like everyone
+// else's.
 function devUrl(url: string) {
-  return !emailIsLive() && process.env.NODE_ENV !== "production" ? url : undefined;
+  return emailFallsBackToConsole() ? url : undefined;
 }

@@ -10,6 +10,19 @@ export function emailIsLive() {
   return Boolean(process.env.RESEND_API_KEY);
 }
 
+/// True only in the one case where a send that never reached a provider is
+/// still an acceptable outcome: local development with no key, where the link
+/// is printed to the console on purpose.
+///
+/// The distinction matters because there are no passwords here. A deployed box
+/// with no key would otherwise log every magic link to a file only the operator
+/// can read, while cheerfully telling each person to check an inbox nothing was
+/// ever sent to — a sign-in that fails silently and blames the user's spam
+/// folder. Better to refuse loudly.
+export function emailFallsBackToConsole() {
+  return !emailIsLive() && process.env.NODE_ENV !== "production";
+}
+
 function fromAddress() {
   return process.env.NAMESAKE_FROM_EMAIL || "Namesake <onboarding@resend.dev>";
 }
@@ -25,6 +38,13 @@ type Sent = { delivered: boolean; error?: string };
 
 async function send(to: string, subject: string, html: string, text: string): Promise<Sent> {
   if (!emailIsLive()) {
+    if (!emailFallsBackToConsole()) {
+      console.error(
+        `[namesake] RESEND_API_KEY is not set, so "${subject}" for ${to} was never sent. ` +
+          `Set it — without it nobody can sign in.`,
+      );
+      return { delivered: false, error: "Email isn't set up on this server yet." };
+    }
     console.log(`\n📮 [namesake] email to ${to} — ${subject}\n${text}\n`);
     return { delivered: false };
   }
