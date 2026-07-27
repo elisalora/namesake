@@ -94,14 +94,14 @@ anchored on Bloom — the boxed tier meant to be handed over at a shower.
 
 | Tier | Who buys | Lasts | Arrives | Price |
 |---|---|---|---|---|
-| **Sprout** | a gifter | 1 month | by email | $59 |
-| **Bloom** ★ | a gifter | 3 months | in a box | $109 |
-| **The Whole Journey** | a gifter | until the due date + 7 days | in a box | $159 |
-| A journey of your own | a parent | 3 months | by email | $49 |
+| **Sprout** | a gifter | 1 month | by email | $10 |
+| **Bloom** ★ | a gifter | 3 months | in a box | $65 |
+| **The Whole Journey** | a gifter | until the due date + 7 days | by email | $50 |
+| A journey of your own | a parent | 3 months | by email | $20 |
 | *One week past due?* | a member | +1 month | — | $19 |
 
 Add-ons ride along on any gift and are made once there's a name to put on them:
-engraved rattle $28, embroidered blanket $58, framed keepsake $30.
+embroidered blanket $75, framed keepsake $30, or both as the keepsake set $95.
 Every price is env-overridable — see `.env.example`.
 
 **The Whole Journey's window can't be known when it's bought.** A gifter rarely knows the

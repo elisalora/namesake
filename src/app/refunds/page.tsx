@@ -67,7 +67,7 @@ export default function RefundsPage() {
 
         <Clause q="Personalised keepsakes">
           <p>
-            An engraved rattle, an embroidered blanket, a framed print: refundable right up until
+            An embroidered blanket, a framed print: refundable right up until
             it&apos;s made, which only happens once the name is settled. After that it can&apos;t
             be — it has their name on it, and there is nobody else it could go to.
           </p>

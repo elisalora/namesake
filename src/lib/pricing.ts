@@ -9,7 +9,7 @@
 // drift out of sync with this file — and each is env-overridable.
 
 export type TierId = "sprout" | "bloom" | "whole_journey" | "self_serve";
-export type AddOnId = "rattle" | "blanket" | "framed_print" | "announcement_cards" | "keepsake_set";
+export type AddOnId = "blanket" | "framed_print" | "keepsake_set";
 
 /// How long a purchase grants.
 ///
@@ -125,14 +125,6 @@ export const EXTEND = {
 };
 
 export const ADD_ONS: Record<AddOnId, AddOn> = {
-  rattle: {
-    id: "rattle",
-    name: "Engraved rattle",
-    blurb: "Pewter, engraved with their initial once the name is settled.",
-    amountCents: cents("NAMESAKE_PRICE_RATTLE_CENTS", 2800),
-    physical: true,
-    shipsAfterNaming: true,
-  },
   blanket: {
     id: "blanket",
     name: "Embroidered blanket",
@@ -149,18 +141,10 @@ export const ADD_ONS: Record<AddOnId, AddOn> = {
     physical: true,
     shipsAfterNaming: true,
   },
-  announcement_cards: {
-    id: "announcement_cards",
-    name: "Announcement cards",
-    blurb: "A set of printed cards to share the name — ready to send once it's chosen.",
-    amountCents: cents("NAMESAKE_PRICE_ANNOUNCEMENT_CARDS_CENTS", 4500),
-    physical: true,
-    shipsAfterNaming: true,
-  },
   keepsake_set: {
     id: "keepsake_set",
     name: "The keepsake set",
-    blurb: "The framed print, the embroidered blanket, and the cards — the whole set, together.",
+    blurb: "The embroidered blanket and the framed print — both, together.",
     amountCents: cents("NAMESAKE_PRICE_KEEPSAKE_SET_CENTS", 9500),
     physical: true,
     shipsAfterNaming: true,

@@ -174,7 +174,7 @@ export default function FaqPage() {
             the gift table, which guests can scan to leave a name and the reason behind it.
           </p>
           <p>
-            Any keepsake you add — an engraved rattle, an embroidered blanket, a framed print — is
+            Any keepsake you add — an embroidered blanket, a framed print — is
             made after they&apos;ve settled on the name, and sent on to them directly. It cannot
             be made before there is a name to put on it.
           </p>

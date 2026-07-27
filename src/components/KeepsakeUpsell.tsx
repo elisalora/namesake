@@ -7,7 +7,7 @@ import { ADD_ONS, formatPrice, type AddOnId } from "@/lib/pricing";
 // The keepsakes offered at the decision moment, in the order they're shown.
 // Each is made-to-order with the chosen name, so they only appear here — once
 // there's actually a name to put on them.
-const KEEPSAKES: AddOnId[] = ["framed_print", "announcement_cards", "blanket", "keepsake_set"];
+const KEEPSAKES: AddOnId[] = ["framed_print", "blanket", "keepsake_set"];
 
 export default function KeepsakeUpsell({ ws }: { ws: WorkspaceState }) {
   // key = `${slot}::${addOn}` — one selection per baby per keepsake.
@@ -87,7 +87,7 @@ export default function KeepsakeUpsell({ ws }: { ws: WorkspaceState }) {
           <p className="mx-auto mt-2 max-w-lg text-sm text-ink-soft">
             {twins
               ? "The name is decided — now it can be embroidered, framed, and sent. Choose a keepsake for each little one."
-              : "The name is decided. Let us make it real — embroidered, framed, or ready to announce, with their name on it."}
+              : "The name is decided. Let us make it real — embroidered or framed, with their name on it."}
           </p>
         </div>
 
