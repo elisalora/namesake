@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { analyzeName, type Sibling } from "@/lib/nameChecks";
 import { hasExpired } from "@/lib/session";
 import { slotLabel } from "@/lib/babies";
+import { turnHolder } from "@/lib/turn";
 
 export async function getWorkspaceState(workspaceId: string) {
   const ws = await db.workspace.findUnique({
@@ -182,6 +183,16 @@ export async function getWorkspaceState(workspaceId: string) {
       authorColor: m.member?.color ?? null,
       createdAt: m.createdAt.toISOString(),
     })),
+    // Whoever is mid-question with the consultant right now, so the other
+    // screen can show it rather than letting them ask into the same breath.
+    // Staleness is settled here rather than on the client: a lock left behind
+    // by a server that died should never be painted as a person still typing.
+    turn: (() => {
+      const holder = turnHolder(ws);
+      if (!holder) return null;
+      const m = ws.members.find((x) => x.id === holder);
+      return { memberId: holder, name: m?.name ?? "Someone" };
+    })(),
   };
 }
 

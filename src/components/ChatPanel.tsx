@@ -64,6 +64,13 @@ export default function ChatPanel({
   /// the conversation is only ever right if that's where they already were.
   const atBottom = useRef(true);
   const streaming = sending !== null;
+  /// The other parent, mid-question. The consultant answers one of them at a
+  /// time — asking into the same breath is how two replies used to end up
+  /// filed under each other's questions — so while this is set the composer
+  /// waits rather than letting them talk over each other.
+  const othersTurn = ws.turn && ws.turn.memberId !== me.id ? ws.turn : null;
+  const otherName =
+    othersTurn?.name ?? ws.members.find((m) => m.id !== me.id && m.joined)?.name ?? "Your partner";
   const decided = ws.status === "decided";
   const multiple = ws.babyCount > 1;
   const opening = openingMessage({
@@ -107,6 +114,10 @@ export default function ChatPanel({
   async function send(text: string) {
     const body = text.trim();
     if (!body || sending) return;
+    // Hold what they typed rather than firing it into a turn that isn't theirs
+    // yet — the server would refuse it anyway, and this way pressing Enter
+    // early costs them nothing.
+    if (othersTurn) return;
     setInput("");
     setChips([]);
     setError(null);
@@ -120,6 +131,23 @@ export default function ChatPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workspaceId: ws.id, message: body }),
       });
+      // A refusal has a body too, and it is not a reply. Streamed straight
+      // into a bubble it would put "turn_in_progress" on screen in the
+      // consultant's voice — so read the status before reading the words.
+      if (!res.ok) {
+        setInput(body);
+        // The server names the holder outright; our own guess is only a
+        // fallback for when it couldn't.
+        const held = res.headers.get("X-Turn-Holder");
+        setError(
+          res.status === 409
+            ? `${held ? decodeURIComponent(held) : otherName} is asking something — yours will send once the consultant has answered.`
+            : res.status === 402
+              ? "Your window has closed. Everything here is still yours to read."
+              : "That didn't send. Nothing's lost — try once more.",
+        );
+        return;
+      }
       if (!res.body) throw new Error("no stream");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -139,16 +167,18 @@ export default function ChatPanel({
         setInput(body);
         setError("That didn't send. Nothing's lost — try once more.");
       }
-    }
-
-    // The server writes the reply before it closes the stream, so by now both
-    // turns are in the database and a refresh returns the real transcript.
-    // That's what the optimistic bubbles were standing in for.
-    try {
-      await onChanged();
     } finally {
-      setSending(null);
-      setLive("");
+      // Every way out of here, including the refusals above. The server writes
+      // the reply before it closes the stream, so by now both turns are in the
+      // database and a refresh returns the real transcript — which is what the
+      // optimistic bubbles were standing in for. A turn that was refused has
+      // nothing to fetch, but it still has to hand the composer back.
+      try {
+        await onChanged();
+      } finally {
+        setSending(null);
+        setLive("");
+      }
     }
   }
 
@@ -267,7 +297,10 @@ export default function ChatPanel({
           </Bubble>
         )}
 
-        {streaming && (
+        {/* Their question is already in the transcript above — it's saved
+            before the reply is asked for — so the dots sit under it and read
+            as the consultant thinking, which is exactly what's happening. */}
+        {(streaming || othersTurn) && (
           <Bubble role="assistant">
             {live || <span className="inline-flex gap-1 text-pewter"><Dot /><Dot d={0.2} /><Dot d={0.4} /></span>}
           </Bubble>
@@ -307,6 +340,15 @@ export default function ChatPanel({
 
       {!decided && (
         <div className="border-t border-line p-3">
+          {/* Say who has the floor rather than leaving a dead send button.
+              Typing stays open — they can be composing their thought while the
+              consultant answers, and it goes the moment the reply lands. */}
+          {othersTurn && (
+            <div className="mb-2 flex items-center gap-2 pl-1 text-xs text-ink-soft">
+              <span className="inline-flex gap-1"><Dot /><Dot d={0.2} /><Dot d={0.4} /></span>
+              {otherName} is asking the consultant something…
+            </div>
+          )}
           <div className="flex items-end gap-2">
             <textarea
               value={input}
@@ -328,7 +370,7 @@ export default function ChatPanel({
             />
             <button
               onClick={() => send(input)}
-              disabled={ws.expired || streaming || !input.trim()}
+              disabled={ws.expired || streaming || Boolean(othersTurn) || !input.trim()}
               className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sage-deep text-white transition hover:bg-pewter disabled:opacity-50"
               aria-label="Send"
             >

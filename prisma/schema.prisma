@@ -161,6 +161,20 @@ model Workspace {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  /// Who is mid-question with the consultant, and since when.
+  ///
+  /// One conversation, two people, and a reply that takes several seconds to
+  /// arrive. Without this, both parents can ask at once and each reply gets
+  /// composed from a transcript missing the other's question — then the two
+  /// replies are stored in the order they *finished*, so one parent's answer
+  /// ends up filed under the other's question. That wrong order is what every
+  /// later turn reads back, so the conversation stays confused.
+  ///
+  /// A plain member id rather than a relation: it's a lock, not a fact about
+  /// the journey, and it expires on its own. See lib/turn.ts.
+  turnMemberId  String?
+  turnStartedAt DateTime?
+
   members     Member[]
   names       NameEntry[]
   comments    Comment[]

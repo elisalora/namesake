@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getWritableMember } from "@/lib/session";
 import { streamConsultant, extractSuggestions, type ConsultantContext, type ChatTurn } from "@/lib/consultant";
 import { openingMessage } from "@/lib/opening";
+import { claimTurn, releaseTurn, turnHolder } from "@/lib/turn";
 import { namedParents } from "@/lib/seat";
 import { babiesLabel, slotLabel, slots } from "@/lib/babies";
 
@@ -42,6 +43,128 @@ export async function POST(request: Request) {
     }
   }
 
+  // Take the conversation before reading it, not after.
+  //
+  // Everything the consultant is about to be told is built from one snapshot
+  // of the transcript, and that snapshot is only worth anything if nobody can
+  // be halfway through adding to it. Two questions in flight at once produced
+  // two replies composed from transcripts each missing the other's question —
+  // and then stored in the order they *finished*, so one parent's answer got
+  // filed under the other's question. Every later turn read that back.
+  //
+  // The refusal is deliberately not a queue. Two people on the same sofa
+  // shouldn't get two consultants talking over each other; the other screen is
+  // already showing that a question is in flight, and this only has to catch
+  // the second or two before it knows.
+  if (!(await claimTurn(workspaceId, member.id))) {
+    // Say who actually has it. The screen can otherwise only guess — "the
+    // other parent" — which is right in the ordinary race and wrong for
+    // someone who left a turn running in another tab, and telling one of them
+    // their partner is asking when their partner isn't is a small lie we
+    // already know the answer to.
+    const holder = await currentHolder(workspaceId);
+    return new Response("turn_in_progress", {
+      status: 409,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+        ...(holder ? { "X-Turn-Holder": encodeURIComponent(holder) } : {}),
+      },
+    });
+  }
+
+  // From here the turn is held, so every way out of this function has to give
+  // it back — including the ones nobody planned. Left held, a request that
+  // never said a word would lock the other parent out until it went stale.
+  let opened: Awaited<ReturnType<typeof openTurn>>;
+  try {
+    opened = await openTurn(workspaceId, message, member);
+  } catch (err) {
+    await releaseTurn(workspaceId, member.id);
+    throw err;
+  }
+  if (!opened) {
+    await releaseTurn(workspaceId, member.id);
+    return new Response("not_found", { status: 404 });
+  }
+  const { ctx, history } = opened;
+
+  const encoder = new TextEncoder();
+  let full = "";
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of streamConsultant(ctx, history)) {
+          full += chunk;
+          controller.enqueue(encoder.encode(chunk));
+        }
+      } catch (err) {
+        // Distinguish "never got going" from "died mid-sentence": the first is
+        // almost always configuration — a model the key can't reach — and the
+        // apology should read differently from a genuine interruption.
+        const started = full.length > 0;
+        const msg = started
+          ? "\n\n(Sorry — I lost my thread there. Could you say that again?)"
+          : "I couldn't reach my thoughts just then. Try me once more in a moment.";
+        controller.enqueue(encoder.encode(msg));
+        full += msg;
+
+        const e = err as { status?: number; message?: string };
+        console.error(
+          `[namesake] consultant failed (model=${process.env.NAMESAKE_MODEL ?? "default"}, ` +
+            `status=${e?.status ?? "none"}, started=${started}): ${e?.message ?? String(err)}`,
+        );
+      } finally {
+        // A turn that produced nothing at all is not worth keeping: saved, it
+        // becomes a blank bubble in the transcript and dead weight in every
+        // later prompt. The parent's own message is already safely stored, so
+        // dropping this loses nothing they wrote.
+        const { clean } = extractSuggestions(full);
+        const body = (clean || full).trim();
+        if (body) {
+          await db.chatMessage.create({
+            data: { workspaceId, role: "assistant", content: body },
+          });
+        }
+        // Only now. Released after the reply is written rather than before, so
+        // whoever goes next reads a transcript with this whole exchange
+        // already in it, rather than one with a question left hanging.
+        await releaseTurn(workspaceId, member.id);
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+  });
+}
+
+/// The name of whoever is mid-question, for the refusal above. Best-effort:
+/// they may well have finished by the time this reads, and a turn nobody can
+/// name is still a turn — the refusal stands either way.
+async function currentHolder(workspaceId: string): Promise<string | null> {
+  const ws = await db.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { turnMemberId: true, turnStartedAt: true, members: { select: { id: true, name: true } } },
+  });
+  if (!ws) return null;
+  const id = turnHolder(ws);
+  return id ? (ws.members.find((m) => m.id === id)?.name ?? null) : null;
+}
+
+/// Read the whole conversation, and add this parent's message to the end of
+/// it. Runs while the turn is held, so what it reads can't shift underneath.
+///
+/// Returns what the consultant needs to answer, or null if the journey has
+/// gone. Its own function so the lock above has a single call to guard rather
+/// than a hundred lines to wrap.
+async function openTurn(
+  workspaceId: string,
+  message: string,
+  member: { id: string; name: string },
+) {
   // Assemble the couple's current context for the consultant.
   const ws = await db.workspace.findUnique({
     where: { id: workspaceId },
@@ -63,7 +186,7 @@ export async function POST(request: Request) {
       messages: { orderBy: { createdAt: "desc" }, take: 40, include: { member: true } },
     },
   });
-  if (!ws) return new Response("not_found", { status: 404 });
+  if (!ws) return null;
 
   // Babies who already have a name, and the ones still waiting. With twins
   // this is the whole shape of the conversation from the first decision on —
@@ -167,50 +290,5 @@ export async function POST(request: Request) {
     data: { workspaceId, memberId: member.id, role: "user", content: message },
   });
 
-  const encoder = new TextEncoder();
-  let full = "";
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const chunk of streamConsultant(ctx, history)) {
-          full += chunk;
-          controller.enqueue(encoder.encode(chunk));
-        }
-      } catch (err) {
-        // Distinguish "never got going" from "died mid-sentence": the first is
-        // almost always configuration — a model the key can't reach — and the
-        // apology should read differently from a genuine interruption.
-        const started = full.length > 0;
-        const msg = started
-          ? "\n\n(Sorry — I lost my thread there. Could you say that again?)"
-          : "I couldn't reach my thoughts just then. Try me once more in a moment.";
-        controller.enqueue(encoder.encode(msg));
-        full += msg;
-
-        const e = err as { status?: number; message?: string };
-        console.error(
-          `[namesake] consultant failed (model=${process.env.NAMESAKE_MODEL ?? "default"}, ` +
-            `status=${e?.status ?? "none"}, started=${started}): ${e?.message ?? String(err)}`,
-        );
-      } finally {
-        // A turn that produced nothing at all is not worth keeping: saved, it
-        // becomes a blank bubble in the transcript and dead weight in every
-        // later prompt. The parent's own message is already safely stored, so
-        // dropping this loses nothing they wrote.
-        const { clean } = extractSuggestions(full);
-        const body = (clean || full).trim();
-        if (body) {
-          await db.chatMessage.create({
-            data: { workspaceId, role: "assistant", content: body },
-          });
-        }
-        controller.close();
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
-  });
+  return { ctx, history };
 }
