@@ -70,10 +70,18 @@ model LoginToken {
 ///   extend  — pushes an existing workspace's window out; `workspaceId` is set
 ///             up front and there is nothing to redeem
 model Purchase {
-  id     String @id @default(cuid())
-  tier   String // sprout | bloom | whole_journey | self_serve | extend
-  kind   String // journey | gift | extend — how it's redeemed
-  status String @default("pending") // pending | paid | redeemed
+  id   String @id @default(cuid())
+  tier String // sprout | bloom | whole_journey | self_serve | extend
+  kind String // journey | gift | extend — how it's redeemed
+
+  /// Where the *money* stands: pending | paid | redeemed | refunded | disputed.
+  ///
+  /// Whether the grant was ever *claimed* is `redeemedAt`, not this. The two
+  /// used to be the same question and are not: money can go back after a
+  /// journey has been opened, and a refund must not make the app forget the
+  /// journey exists. Read `redeemedAt` for "has this been opened", and this for
+  /// "are we still holding the money".
+  status String @default("pending")
 
   /// How long it grants. `months` is fixed at purchase; `due_date_grace` can't
   /// be — a gifter rarely knows the due date — so it's resolved at redemption
@@ -103,6 +111,11 @@ model Purchase {
 
   stripeSessionId String? @unique // also the idempotency key for fulfillment
 
+  /// The charge behind the session. Refunds and disputes arrive as charge
+  /// events, which carry a payment intent and no session — this is what turns
+  /// one back into a purchase without a round trip to Stripe.
+  stripePaymentIntentId String? @unique
+
   /// Physical fulfillment. Set when the tier ships a box or an add-on was
   /// bought; the address arrives from Stripe with the payment.
   needsShipping   Boolean   @default(false)
@@ -113,6 +126,7 @@ model Purchase {
   createdAt  DateTime  @default(now())
   paidAt     DateTime?
   redeemedAt DateTime?
+  refundedAt DateTime?
 
   items     PurchaseItem[]
   workspace Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
