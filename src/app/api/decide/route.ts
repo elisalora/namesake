@@ -54,8 +54,9 @@ export async function POST(request: Request) {
   // aside for the one they just picked, or for none at all.
   const oldMiddle = chosenMiddles.find((n) => n.chosenSlot === target && n.id !== middleId);
 
+  let middle = null;
   if (middleId) {
-    const middle = await db.nameEntry.findFirst({
+    middle = await db.nameEntry.findFirst({
       where: { id: middleId, workspaceId, role: "middle" },
     });
     if (!middle) return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -64,12 +65,21 @@ export async function POST(request: Request) {
   const named = new Set([...taken, target]);
   const allNamed = named.size >= ws.babyCount;
 
+  // The day they settled on it, stamped only when the name actually crosses
+  // into this baby's slot. This endpoint is also how a middle name gets added
+  // weeks later and how the story gets reworded, and neither of those is the
+  // day they chose the name — re-stamping on every call is exactly the drift
+  // that made the keepsake print a moving date in the first place.
+  const now = new Date();
+  const chosenAtFor = (entry: { chosenSlot: number | null }) =>
+    entry.chosenSlot === target ? {} : { chosenAt: now };
+
   await db.$transaction([
     ...(displaced
       ? [
           db.nameEntry.update({
             where: { id: displaced.id },
-            data: { status: "shortlist", chosenSlot: null, chosenReason: null },
+            data: { status: "shortlist", chosenSlot: null, chosenReason: null, chosenAt: null },
           }),
         ]
       : []),
@@ -77,18 +87,24 @@ export async function POST(request: Request) {
       ? [
           db.nameEntry.update({
             where: { id: oldMiddle.id },
-            data: { status: "shortlist", chosenSlot: null },
+            data: { status: "shortlist", chosenSlot: null, chosenAt: null },
           }),
         ]
       : []),
-    ...(middleId
-      ? [db.nameEntry.update({ where: { id: middleId }, data: { status: "chosen", chosenSlot: target } })]
+    ...(middleId && middle
+      ? [
+          db.nameEntry.update({
+            where: { id: middleId },
+            data: { status: "chosen", chosenSlot: target, ...chosenAtFor(middle) },
+          }),
+        ]
       : []),
     db.nameEntry.update({
       where: { id: nameId },
       data: {
         status: "chosen",
         chosenSlot: target,
+        ...chosenAtFor(name),
         // Only touched when they were asked. Setting a middle name later
         // shouldn't quietly erase the story they wrote when they chose.
         ...(reason !== undefined ? { chosenReason: reason || null } : {}),
@@ -135,7 +151,10 @@ export async function DELETE(request: Request) {
     ...undoing.map((n) =>
       db.nameEntry.update({
         where: { id: n.id },
-        data: { status: "shortlist", chosenSlot: null, chosenReason: null },
+        // chosenAt goes with the decision it dates. A name put back on the
+        // shortlist and chosen again months later was chosen on the second day,
+        // not the first.
+        data: { status: "shortlist", chosenSlot: null, chosenReason: null, chosenAt: null },
       }),
     ),
     db.workspace.update({ where: { id: workspaceId }, data: { status: "active" } }),

@@ -45,7 +45,24 @@ export default async function KeepsakePage(props: { params: Promise<{ id: string
   // would be the worst place for a placeholder to survive.
   const parentLine = buildParentLine(ws.members);
   const contributors = Array.from(new Set(ws.suggestions.map((s) => s.suggesterName).filter(Boolean)));
-  const decidedOn = ws.updatedAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  // The day the naming was finished, from the names themselves. With twins
+  // that's the later of the two — one name is a milestone, both is the day
+  // this certificate became true.
+  //
+  // Not ws.updatedAt: that means "when this row was last touched", and every
+  // consultant message touches it, so a couple who came back in May to talk
+  // about a middle name printed a keepsake dating their daughter to May.
+  // Null for names chosen before chosenAt existed, and the line is dropped
+  // rather than guessed — this gets printed and kept.
+  const chosenAt = chosen
+    .map((n) => n.chosenAt)
+    .filter((d): d is Date => d !== null)
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  const decidedOn = chosenAt?.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-10">
@@ -131,7 +148,7 @@ export default async function KeepsakePage(props: { params: Promise<{ id: string
 
           <div className="mt-10 text-ink-soft">
             <div className="font-display text-xl text-pewter">{parentLine}</div>
-            <div className="mt-1 text-sm">chosen {decidedOn}</div>
+            {decidedOn && <div className="mt-1 text-sm">chosen {decidedOn}</div>}
           </div>
         </div>
       </article>
