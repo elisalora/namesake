@@ -245,7 +245,15 @@ model NameEntry {
   /// The story of why they chose it — one per baby, because with twins there
   /// are two stories and the keepsake should carry both.
   chosenReason String?
-  createdAt    DateTime @default(now())
+  /// The day they settled on it. Stamped once, when the name crosses into
+  /// chosen, and cleared if they unpick it — coming back later to add a middle
+  /// name or reword the story must not move it. The keepsake prints this date
+  /// and people keep the printout, so it is a historical fact rather than a
+  /// modification time. Null for names chosen before this column existed:
+  /// nothing in the database recorded the day, and the keepsake omits the line
+  /// rather than print a guess.
+  chosenAt     DateTime?
+  createdAt    DateTime  @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   ratings   Rating[]
