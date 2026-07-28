@@ -20,12 +20,78 @@ const ENRICH_MODEL = process.env.NAMESAKE_ENRICH_MODEL || "claude-haiku-4-5";
 // even when the ladder has been walked all the way down.
 const CHAT_FALLBACKS = ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5"];
 
+// The same idea for enrichment, and for the same reason: the catch below turns
+// a dead model id into a name that is silently never tagged, forever. Ordered
+// cheapest first — this is a dictionary lookup, not the product.
+const ENRICH_FALLBACKS = ["claude-haiku-4-5", "claude-sonnet-5"];
+
 // Once a model has answered, remember it for the life of the process so a
 // misconfigured id costs one wasted round trip rather than one per message.
 let preferredModel: string | null = null;
+let preferredEnrichModel: string | null = null;
 
 function chatModels(): string[] {
   return [...new Set([preferredModel, CHAT_MODEL, ...CHAT_FALLBACKS].filter(Boolean) as string[])];
+}
+
+function enrichModels(): string[] {
+  return [
+    ...new Set([preferredEnrichModel, ENRICH_MODEL, ...ENRICH_FALLBACKS].filter(Boolean) as string[]),
+  ];
+}
+
+/// Models that accept adaptive thinking and an `effort` hint.
+///
+/// The ladder spans two generations on purpose, and they do not take the same
+/// request. Sonnet 5 and its Opus siblings want `thinking` and
+/// `output_config.effort`; `claude-haiku-4-5` — the last rung, the one that
+/// answers when everything above it is unreachable — rejects both with a 400.
+/// Tuning every request identically would make the safety net fail in exactly
+/// the moment it exists for.
+///
+/// An id we don't recognise gets the plain request. A model this list hasn't
+/// heard of is as likely to be old as new, and an untuned reply is a reply.
+const TUNED_MODELS = new Set([
+  "claude-opus-5",
+  "claude-sonnet-5",
+  "claude-fable-5",
+  "claude-mythos-5",
+  "claude-opus-4-8",
+  "claude-opus-4-7",
+  "claude-opus-4-6",
+  "claude-sonnet-4-6",
+]);
+
+/// How hard the consultant is asked to think.
+///
+/// Left unset the API uses `high`, which is more deliberation than choosing
+/// between two lovely names needs and is billed accordingly — see the note at
+/// the top of this file about where the money goes. `medium` on Sonnet 5 sits
+/// roughly where `high` did on the model before it.
+const EFFORT = "medium" as const;
+
+/// Room for the reply *and* for the thinking that now comes before it.
+///
+/// This is a cap on both together. Sized for the reply alone — which is all it
+/// used to have to cover, back when omitting `thinking` meant no thinking — a
+/// thoughtful turn spends the budget reasoning and gets cut off partway
+/// through the answer, or before it starts. The reply is a few short
+/// paragraphs; the rest of this is headroom, and headroom is only billed if
+/// it's used.
+const MAX_TOKENS = 8000;
+
+/// The knobs a given model will actually accept. See `TUNED_MODELS`.
+///
+/// `display: "omitted"` is set rather than left to the default because the
+/// default has already moved once. Parents are not shown the consultant's
+/// reasoning — they are shown its answer — so there is nothing to gain from
+/// having it sent back to us.
+function tuningFor(model: string) {
+  if (!TUNED_MODELS.has(model)) return {};
+  return {
+    thinking: { type: "adaptive" as const, display: "omitted" as const },
+    output_config: { effort: EFFORT },
+  };
 }
 
 /// A model that can't be reached at all: retired, mistyped, or not enabled for
@@ -241,35 +307,47 @@ export async function enrichName(
 ): Promise<{ meaning?: string; origin?: string; gender?: string } | null> {
   if (!hasApiKey()) return null;
   const client = new Anthropic();
-  try {
-    const res = await client.messages.create({
-      model: ENRICH_MODEL,
-      max_tokens: 200,
-      system:
-        'You are a concise baby-name reference. For the given first name, reply ONLY with compact JSON: {"origin": string, "meaning": string, "gender": "girl"|"boy"|"neutral"}. Keep origin to 1-3 words (e.g. "Greek", "Old English"). Keep meaning under 8 words, warm and plain. If unknown, use your best scholarly guess. No prose, no markdown.',
-      messages: [{ role: "user", content: firstName }],
-    });
-    const text = res.content.find((b) => b.type === "text");
-    if (!text || text.type !== "text") return null;
-    const match = text.text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    const parsed = JSON.parse(match[0]) as { origin?: string; meaning?: string; gender?: string };
-    const gender = ["girl", "boy", "neutral"].includes(parsed.gender ?? "") ? parsed.gender : undefined;
-    return {
-      origin: parsed.origin?.slice(0, 60) || undefined,
-      meaning: parsed.meaning?.slice(0, 120) || undefined,
-      gender,
-    };
-  } catch (err) {
-    // Silent enrichment failure is why a name can sit untagged forever, and
-    // the cause is usually the configured model rather than the name.
-    const e = err as { status?: number; message?: string };
-    console.error(
-      `[namesake] enrichName failed for "${firstName}" ` +
-        `(model=${ENRICH_MODEL}, status=${e?.status ?? "none"}): ${e?.message ?? String(err)}`,
-    );
-    return null;
+
+  // The same ladder the consultant walks, for the same reason. This used to be
+  // one hardcoded id and one try/catch, so a stale NAMESAKE_ENRICH_MODEL meant
+  // every name was quietly untagged from then on — which is precisely the
+  // symptom the catch below already names.
+  for (const model of enrichModels()) {
+    try {
+      const res = await client.messages.create({
+        model,
+        max_tokens: 200,
+        system:
+          'You are a concise baby-name reference. For the given first name, reply ONLY with compact JSON: {"origin": string, "meaning": string, "gender": "girl"|"boy"|"neutral"}. Keep origin to 1-3 words (e.g. "Greek", "Old English"). Keep meaning under 8 words, warm and plain. If unknown, use your best scholarly guess. No prose, no markdown.',
+        messages: [{ role: "user", content: firstName }],
+      });
+      preferredEnrichModel = model;
+      const text = res.content.find((b) => b.type === "text");
+      if (!text || text.type !== "text") return null;
+      const match = text.text.match(/\{[\s\S]*\}/);
+      if (!match) return null;
+      const parsed = JSON.parse(match[0]) as { origin?: string; meaning?: string; gender?: string };
+      const gender = ["girl", "boy", "neutral"].includes(parsed.gender ?? "") ? parsed.gender : undefined;
+      return {
+        origin: parsed.origin?.slice(0, 60) || undefined,
+        meaning: parsed.meaning?.slice(0, 120) || undefined,
+        gender,
+      };
+    } catch (err) {
+      // Silent enrichment failure is why a name can sit untagged forever, and
+      // the cause is usually the configured model rather than the name.
+      const e = err as { status?: number; message?: string };
+      console.error(
+        `[namesake] enrichName failed for "${firstName}" ` +
+          `(model=${model}, status=${e?.status ?? "none"}): ${e?.message ?? String(err)}`,
+      );
+      // Only an unreachable model is worth trying the next one for. A name
+      // this model can't answer is a name none of them can, and a missing tag
+      // is not worth three round trips.
+      if (!isModelUnavailable(err)) return null;
+    }
   }
+  return null;
 }
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
@@ -309,11 +387,8 @@ export async function* streamConsultant(
       try {
         const stream = client.messages.stream({
           model,
-          // Room for the reply *and* for thinking, which the model may do
-          // before writing. Sized tight, a thoughtful turn spends the budget
-          // reasoning and streams nothing — a silent failure that looks
-          // identical to a broken consultant.
-          max_tokens: 2400,
+          max_tokens: MAX_TOKENS,
+          ...tuningFor(model),
           system,
           messages,
         });
@@ -358,6 +433,13 @@ export async function* streamConsultant(
         console.error(
           `[namesake] consultant model ${model} failed (status=${e?.status ?? "none"}): ${e?.message ?? String(err)}`,
         );
+
+        // The ladder exists for one failure — a model this key can't reach —
+        // and only that failure is worth walking it for. Anything else is
+        // something about *this request* the next model will dislike just as
+        // much, so trying two more of them only puts two more round trips in
+        // front of an apology that was already decided.
+        if (!isModelUnavailable(err)) throw err;
         break;
       }
     }
@@ -373,10 +455,23 @@ export async function* streamConsultant(
 /// an empty message, and while the API tolerates those, they cost tokens and
 /// render as blank bubbles. The last turn is always the parent's new message,
 /// which is validated non-empty upstream, so this can never empty the list.
+///
+/// And whatever is left has to *open* on a parent. The route reads the newest
+/// forty messages and reverses them, which lands on a user turn only while
+/// every exchange is a stored pair — and a turn that streamed nothing is
+/// deliberately not stored, so one of those knocks the window's leading edge
+/// onto an assistant message. The API rejects that outright, which is how a
+/// single silent turn used to take the *next* one down with it: the same
+/// failure the note in the route about "leading with an assistant message"
+/// already describes.
 function sendableHistory(history: ChatTurn[]): { role: "user" | "assistant"; content: string }[] {
-  return history
+  const turns = history
     .filter((t) => t.content && t.content.trim().length > 0)
     .map((t) => ({ role: t.role, content: t.content }));
+
+  let first = 0;
+  while (first < turns.length && turns[first].role === "assistant") first++;
+  return turns.slice(first);
 }
 
 // A stand-in for local development only, so the product is explorable without
@@ -427,5 +522,18 @@ export function extractSuggestions(text: string): {
   };
   const names = take("SUGGESTIONS");
   const middles = take("MIDDLES");
+
+  // A reply that runs out of budget is cut off at the last thing it was
+  // writing — and the marker is on the last line, by instruction, so it is the
+  // first thing lost. `take` only matches a marker with its closing brackets,
+  // so a half-written one survived it and got stored verbatim: the parent
+  // watched "[[SUGGESTIONS: Iris, Ma" appear in the consultant's voice the
+  // moment the real message replaced the one on screen.
+  //
+  // Every complete marker is gone by now, so a `[[` still standing is one that
+  // never got closed. Cut from there — the same thing the live stream does.
+  const orphan = clean.indexOf("[[");
+  if (orphan >= 0) clean = clean.slice(0, orphan);
+
   return { clean: clean.trim(), names, middles };
 }
