@@ -1,5 +1,6 @@
 import Link from "next/link";
 import DuckMark, { OrnamentRule } from "@/components/DuckMark";
+import { supportAddress } from "@/lib/email";
 
 export const metadata = {
   title: "Namesake — refunds",
@@ -7,12 +8,15 @@ export const metadata = {
     "Fourteen days from purchase, for any reason. Boxes refundable until posted; personalised keepsakes until they're made.",
 };
 
-const SUPPORT = process.env.NAMESAKE_SUPPORT_EMAIL || "hello@namesake.alora.tech";
-
 // Written to be read by someone who is slightly annoyed. Short sentences,
 // no conditions hiding in a clause, and the awkward cases answered rather
 // than left to a conversation.
 export default function RefundsPage() {
+  // Read per-render, not at module scope: this is the address a policy page
+  // publishes, and it should follow the environment it's deployed into rather
+  // than whatever was set when the bundle was built.
+  const SUPPORT = supportAddress();
+
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 py-10">
       <header className="flex items-center justify-between">
