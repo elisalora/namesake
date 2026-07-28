@@ -26,10 +26,33 @@ const schema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("gift"),
     tier: z.string().refine(isTierId, "Unknown tier."),
-    purchaserEmail: z.string().trim().email("We'll send your receipt here."),
-    purchaserName: z.string().trim().min(1).max(60),
-    recipientEmail: z.string().trim().email().optional().or(z.literal("")),
-    giftMessage: z.string().trim().max(500).optional().or(z.literal("")),
+    // These strings are shown to the buyer verbatim (see the `safeParse`
+    // failure below), so they have to read as errors. "We'll send your receipt
+    // here." was a field hint sitting in the message slot: someone who typed
+    // an address the browser accepted but this rejects — a domain with no dot,
+    // say — was shown a sentence that never mentioned anything was wrong, on
+    // the one screen where giving up costs a sale.
+    purchaserEmail: z
+      .string()
+      .trim()
+      .email("That email doesn't look quite right — check for a missing dot or a stray character. Your receipt goes here."),
+    purchaserName: z
+      .string()
+      .trim()
+      .min(1, "We'll need your name, so they know who it's from.")
+      .max(60, "That name is a little long — 60 characters or fewer."),
+    recipientEmail: z
+      .string()
+      .trim()
+      .email("Their email doesn't look quite right — check for a missing dot or a stray character.")
+      .optional()
+      .or(z.literal("")),
+    giftMessage: z
+      .string()
+      .trim()
+      .max(500, "That note is a little longer than the card can hold — 500 characters or fewer.")
+      .optional()
+      .or(z.literal("")),
     addOns,
   }),
   // More time on a journey you're already part of.

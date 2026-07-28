@@ -19,9 +19,15 @@ const PALETTE = ["#7d8f76", "#a98a4f"];
 
 // What the start form collects. The draft rides inside the signup magic link,
 // so the journey isn't created until the owner has proven their address.
+///
+/// Every message here is shown to a customer verbatim: `/api/checkout` hands
+/// `issues[0].message` straight back, and StartForm renders it in its error
+/// slot. Left unset, Zod supplies its own — "Too big: expected string to have
+/// <=60 characters" — which is a sentence written for a developer reading a
+/// stack trace, arriving instead in front of someone trying to pay.
 export const journeyDraft = z.object({
-  babyLabel: z.string().trim().max(60).optional(),
-  lastName: z.string().trim().max(60).optional(),
+  babyLabel: z.string().trim().max(60, "That nickname is a little long — 60 characters or fewer.").optional(),
+  lastName: z.string().trim().max(60, "That surname is a little long — 60 characters or fewer.").optional(),
   /// Twins and triplets. Asked at the start because it changes the whole
   /// journey — two names, weighed against each other — and finding out
   /// halfway through is worse than one more question here.
@@ -32,16 +38,23 @@ export const journeyDraft = z.object({
   expecting: z.enum(["girl", "boy", "mixed", "surprise"]).optional(),
   dueDate: z.string().optional(),
   you: z.object({
-    name: z.string().trim().min(1).max(60),
-    email: z.string().trim().email(),
+    name: z.string().trim().min(1, "We'll need your first name.").max(60, "That first name is a little long — 60 characters or fewer."),
+    // The browser's type=email widget accepts a domain with no dot, so
+    // "alex@examplecom" reaches this line looking fine to whoever typed it.
+    email: z.string().trim().email("That email doesn't look quite right — check for a missing dot or a stray character."),
   }),
   // The partner's name is optional: plenty of people start this on their own,
   // before they've told anyone, and being made to type someone else's name is
   // a strange first hurdle. The seat is still created — it just waits to be
   // named until they claim it.
   partner: z.object({
-    name: z.string().trim().max(60).optional().or(z.literal("")),
-    email: z.string().trim().email().optional().or(z.literal("")),
+    name: z.string().trim().max(60, "That first name is a little long — 60 characters or fewer.").optional().or(z.literal("")),
+    email: z
+      .string()
+      .trim()
+      .email("Your partner's email doesn't look quite right — check for a missing dot or a stray character.")
+      .optional()
+      .or(z.literal("")),
   }),
 });
 

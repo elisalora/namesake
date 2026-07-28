@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { namedParents, parentLine as buildParentLine } from "@/lib/seat";
 import { babiesLabel } from "@/lib/babies";
+import { hasExpired } from "@/lib/session";
 import SuggestForm from "@/components/SuggestForm";
 
 export default async function SuggestPage(props: { params: Promise<{ slug: string }> }) {
@@ -57,6 +58,25 @@ export default async function SuggestPage(props: { params: Promise<{ slug: strin
           {parentLine} {solo ? "has" : "have"} already found the{" "}
           {ws.babyCount > 1 ? "names" : "name"} for {babiesLabel(ws.babyLabel, ws.babyCount)}. Thank
           you so much for being part of it.
+        </p>
+      </main>
+    );
+  }
+
+  // The window closing is a write refusal like any other (`/api/suggest` sends
+  // 409), and this page has to know it before it draws the form. It didn't —
+  // so an expired journey showed a guest the full form, the placeholder asking
+  // for the story behind the name, and a button that could only ever fail. The
+  // card on the gift table keeps pointing here long after the window ends.
+  if (hasExpired(ws)) {
+    return (
+      <main className="mx-auto flex max-w-lg flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+        <div className="mb-3 text-3xl">✦</div>
+        <h1 className="font-display text-3xl text-pewter">Suggestions have closed</h1>
+        <p className="mt-3 leading-relaxed text-ink-soft">
+          {parentLine} {solo ? "isn't" : "aren't"} collecting names here any more. If you&apos;ve
+          got one you love, it&apos;s worth telling them yourself — and they can reopen this if
+          they&apos;d like to.
         </p>
       </main>
     );
