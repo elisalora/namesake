@@ -19,10 +19,22 @@ export async function GET(request: Request, ctx: { params: Promise<{ token: stri
 
   // A brand-new journey: if they gave their partner's address, send that
   // invite now, while they're watching the dashboard appear.
+  //
+  // Best-effort on purpose: they are mid-redirect and the journey is already
+  // theirs. An undeliverable send is logged rather than swallowed, and the
+  // welcome modal they land on still offers the invite form for the seat, so
+  // nothing here claims a partner was emailed when they weren't.
   if (result.welcome && result.inviteToken && result.workspaceId) {
-    await sendPartnerInvite({ workspaceId: result.workspaceId, origin: originFrom(request) }).catch(
-      (err) => console.error("[namesake] partner invite failed", err),
-    );
+    const invite = await sendPartnerInvite({
+      workspaceId: result.workspaceId,
+      origin: originFrom(request),
+    }).catch((err) => {
+      console.error("[namesake] partner invite failed", err);
+      return { ok: false as const, reason: "undeliverable" as const, error: String(err) };
+    });
+    if (!invite.ok && invite.reason === "undeliverable") {
+      console.error(`[namesake] partner invite was not delivered: ${invite.error}`);
+    }
   }
 
   if (!result.workspaceId) {

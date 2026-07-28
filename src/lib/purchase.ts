@@ -311,7 +311,13 @@ export async function startCheckout(purchaseId: string, origin: string) {
         ? `${origin}/w/${purchase.workspaceId}?extended=1`
         : purchase.kind === "keepsake"
           ? `${origin}/w/${purchase.workspaceId}?keepsake=thanks`
-          : `${origin}/redeem/${purchase.redeemCode}`,
+          : // `?bought=1` marks the browser Stripe just sent back as the buyer's,
+            // not the recipient's. It matters for a gift: the redeem link is a
+            // bearer token, and without this the person who paid lands on the
+            // form that opens the present under their own account. The redeem
+            // page turns it into a receipt when the gift is going to someone
+            // else, and ignores it when the buyer is the one who needs the code.
+            `${origin}/redeem/${purchase.redeemCode}?bought=1`,
     cancel_url:
       purchase.kind === "extend" || purchase.kind === "keepsake"
         ? `${origin}/w/${purchase.workspaceId}`
@@ -370,7 +376,26 @@ export async function fulfillPurchase(args: {
 
       // Extend from the current end date, not from today, so buying more time
       // early doesn't quietly throw away the time already paid for.
-      const base = ws.expiresAt && ws.expiresAt > now ? ws.expiresAt : now;
+      //
+      // A null `expiresAt` is not "already over" — it means the journey predates
+      // billing and never ends (`session.ts`, `hasExpired`). Writing a date onto
+      // it would make paying for more time the one action that takes it away, so
+      // the extension is recorded and the journey keeps its unlimited window.
+      // Checkout refuses these before any money moves; this is the backstop for
+      // a purchase that was already in flight.
+      if (ws.expiresAt === null) {
+        await tx.purchase.update({
+          where: { id: purchase.id },
+          data: { status: "redeemed", paidAt: now, redeemedAt: now, stripeSessionId, ...shipping },
+        });
+        console.warn(
+          `[namesake] extension ${purchase.id} applied to journey ${ws.id}, which never expires — ` +
+            `left unlimited. This one is worth refunding.`,
+        );
+        return { state: "extended" as const, purchase };
+      }
+
+      const base = ws.expiresAt > now ? ws.expiresAt : now;
       await tx.workspace.update({
         where: { id: ws.id },
         data: { expiresAt: resolveExpiry(purchase, base) },
@@ -439,7 +464,30 @@ export async function fulfillPurchase(args: {
 
 export type RedeemPurchaseResult =
   | { ok: true; workspaceId: string; inviteToken: string; expiresAt: Date }
-  | { ok: false; reason: "invalid" | "unpaid" | "spent" | "needs-details" | "malformed" };
+  | { ok: false; reason: "invalid" | "unpaid" | "spent" | "needs-details" | "malformed" | "not-yours" };
+
+/// Whether this grant is one the person holding it bought *for someone else*.
+///
+/// Checkout sends the buyer to the redeem link when they pay, and a gift is
+/// claimed by whoever opens it — so a signed-in gifter is one form away from
+/// opening the present they just bought, under their own account, with no way
+/// back: the code is spent and the person it was for is told it has already
+/// been claimed.
+///
+/// Deliberately narrow. Buying a boxed tier for yourself is a real thing people
+/// do, and there the buyer *is* the recipient; this only fires when a different
+/// address was named as the destination.
+export function boughtForSomeoneElse(
+  purchase: { kind: string; purchaserEmail: string; recipientEmail: string | null },
+  redeemerEmail: string,
+) {
+  if (purchase.kind !== "gift" || !purchase.recipientEmail) return false;
+  const redeemer = normalizeEmail(redeemerEmail);
+  return (
+    redeemer === normalizeEmail(purchase.purchaserEmail) &&
+    redeemer !== normalizeEmail(purchase.recipientEmail)
+  );
+}
 
 /// Turn a paid grant into an actual journey, owned by whoever redeems it.
 ///
@@ -448,9 +496,10 @@ export type RedeemPurchaseResult =
 /// what resolves a due-date-relative window.
 export async function redeemPurchase(
   code: string,
-  ownerUserId: string,
+  owner: { id: string; email: string },
   details?: unknown,
 ): Promise<RedeemPurchaseResult> {
+  const ownerUserId = owner.id;
   const purchase = await db.purchase.findUnique({ where: { redeemCode: code } });
   // Only journeys and gifts become workspaces. An extension or a keepsake is
   // tied to an existing journey and has nothing to redeem.
@@ -459,6 +508,7 @@ export async function redeemPurchase(
   }
   if (purchase.status === "redeemed") return { ok: false, reason: "spent" };
   if (purchase.status !== "paid") return { ok: false, reason: "unpaid" };
+  if (boughtForSomeoneElse(purchase, owner.email)) return { ok: false, reason: "not-yours" };
 
   const source = details ?? (purchase.draft ? JSON.parse(purchase.draft) : null);
   if (!source) return { ok: false, reason: "needs-details" };

@@ -19,6 +19,7 @@ const MESSAGES: Record<string, string> = {
   spent: "That gift has already been opened.",
   "needs-details": "We still need a few details about the journey.",
   malformed: "Something was missing from those details.",
+  "not-yours": "This gift is for someone else — it's theirs to open.",
 };
 
 /// Lets the redeem page wait out the gap between Stripe redirecting the browser
@@ -45,9 +46,9 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Please sign in first." }, { status: 401 });
 
-  const result = await redeemPurchase(parsed.data.code, user.id, parsed.data.details);
+  const result = await redeemPurchase(parsed.data.code, user, parsed.data.details);
   if (!result.ok) {
-    const status = result.reason === "unpaid" ? 409 : 400;
+    const status = result.reason === "unpaid" ? 409 : result.reason === "not-yours" ? 403 : 400;
     return NextResponse.json({ error: MESSAGES[result.reason] ?? "That didn't work." }, { status });
   }
 
@@ -59,15 +60,26 @@ export async function POST(request: Request) {
     if (owner) await db.user.update({ where: { id: user.id }, data: { name: owner.name } });
   }
 
-  // If they named a partner with an email, invite them straight away.
-  await sendPartnerInvite({
+  // If they named a partner with an email, invite them straight away. The
+  // journey exists either way — the grant is spent and failing the request now
+  // would strand it — so this stays best-effort. But it reports back, because a
+  // partner who was never emailed is otherwise invisible until someone asks why
+  // they never arrived; the dashboard's own invite card is the way to retry.
+  const invite = await sendPartnerInvite({
     workspaceId: result.workspaceId,
     origin: originFrom(request),
-  }).catch((err) => console.error("[namesake] partner invite failed", err));
+  }).catch((err) => {
+    console.error("[namesake] partner invite failed", err);
+    return { ok: false as const, reason: "undeliverable" as const, error: String(err) };
+  });
+  if (!invite.ok && invite.reason === "undeliverable") {
+    console.error(`[namesake] partner invite was not delivered: ${invite.error}`);
+  }
 
   return NextResponse.json({
     ok: true,
     workspaceId: result.workspaceId,
     inviteToken: result.inviteToken,
+    partnerInvited: invite.ok ? invite.email : null,
   });
 }

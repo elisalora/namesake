@@ -29,6 +29,21 @@ export async function POST(request: Request) {
   const access = await getWritableMember(data.workspaceId);
   if (!access.ok) return writeDenied(access);
 
+  // The membership check above is on `workspaceId`; the suggestion id arrives
+  // separately and belongs to whatever journey it was left on. Checked here,
+  // before anything is written, so a stale or foreign id can't leave a name
+  // behind after the update fails — and can't mark someone else's suggestion
+  // imported, quietly hiding it from the couple who were waiting for it.
+  if (data.suggestionId) {
+    const suggestion = await db.suggestion.findUnique({
+      where: { id: data.suggestionId },
+      select: { workspaceId: true },
+    });
+    if (!suggestion || suggestion.workspaceId !== data.workspaceId) {
+      return NextResponse.json({ error: "That suggestion isn't in this journey." }, { status: 404 });
+    }
+  }
+
   const name = await db.nameEntry.create({
     data: {
       workspaceId: data.workspaceId,
@@ -57,7 +72,13 @@ export async function POST(request: Request) {
   });
 
   if (data.suggestionId) {
-    await db.suggestion.update({ where: { id: data.suggestionId }, data: { status: "imported" } });
+    // `updateMany` so the workspace scope is part of the write itself, and so a
+    // suggestion deleted between the check and here is a no-op rather than an
+    // unhandled P2025 thrown after the name row already exists.
+    await db.suggestion.updateMany({
+      where: { id: data.suggestionId, workspaceId: data.workspaceId },
+      data: { status: "imported" },
+    });
   }
 
   return NextResponse.json({ id: name.id });
