@@ -1,6 +1,6 @@
 import Link from "next/link";
 import DuckMark, { OrnamentRule } from "@/components/DuckMark";
-import { TIERS, formatPrice } from "@/lib/pricing";
+import { TIERS, GIFT_TIERS, formatPrice } from "@/lib/pricing";
 
 export const metadata = {
   title: "Namesake — questions",
@@ -12,8 +12,15 @@ export const metadata = {
 // person? Leading with that, plainly, is worth more than any amount of hedging
 // further down — someone paying to be advised should know what's advising them.
 export default function FaqPage() {
-  const sprout = formatPrice(TIERS.sprout.amountCents);
-  const whole = formatPrice(TIERS.whole_journey.amountCents);
+  // The range has to come from the catalog, not from two tiers picked by hand.
+  // Naming `sprout` and `whole_journey` quoted "$10 to $50" while Bloom — the
+  // featured tier, the one this page exists to justify — sat above the ceiling
+  // at $65. On a page whose whole argument is being straight about money, the
+  // cheapest thing we sell to the dearest is the only defensible pair, and
+  // every price here is env-overridable, so it has to be computed.
+  const amounts = [...GIFT_TIERS, TIERS.self_serve].map((t) => t.amountCents);
+  const cheapest = formatPrice(Math.min(...amounts));
+  const dearest = formatPrice(Math.max(...amounts));
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 py-10">
@@ -66,8 +73,8 @@ export default function FaqPage() {
           </p>
           <p>
             That is a real service and worth every penny to the people who buy it. It is also out
-            of reach for almost everyone, which is the gap this sits in: {sprout} to {whole}, for
-            the same underlying structure — better questions than you&apos;d think to ask, a
+            of reach for almost everyone, which is the gap this sits in: {cheapest} to {dearest},
+            for the same underlying structure — better questions than you&apos;d think to ask, a
             shortlist two people can actually converge on, and something to keep at the end.
           </p>
         </Answer>
