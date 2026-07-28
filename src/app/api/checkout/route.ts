@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { db } from "@/lib/db";
 import { originFrom, getCurrentUser } from "@/lib/auth";
 import { journeyDraft } from "@/lib/journey";
 import { getMemberForWorkspace } from "@/lib/session";
@@ -78,6 +79,22 @@ export async function POST(request: Request) {
     const member = await getMemberForWorkspace(input.workspaceId);
     const user = await getCurrentUser();
     if (!member || !user) return NextResponse.json({ error: "Not your journey." }, { status: 403 });
+
+    // A journey with no end date predates billing and never expires. There is
+    // no more time to sell them, and applying a month to it would be a downgrade
+    // they paid for. The dashboard already hides the button; this closes the
+    // route behind it.
+    const ws = await db.workspace.findUnique({
+      where: { id: input.workspaceId },
+      select: { expiresAt: true },
+    });
+    if (ws && ws.expiresAt === null) {
+      return NextResponse.json(
+        { error: "This journey doesn't expire — there's no more time to add." },
+        { status: 400 },
+      );
+    }
+
     purchase = await createExtension(input.workspaceId, user.email, member.name);
   } else {
     const tier = TIERS[input.tier as keyof typeof TIERS];

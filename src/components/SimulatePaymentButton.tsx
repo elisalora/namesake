@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 
 export default function SimulatePaymentButton({
   purchaseId,
-  fallbackHref,
+  successHref,
 }: {
   purchaseId: string;
-  fallbackHref: string;
+  successHref: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -25,7 +25,9 @@ export default function SimulatePaymentButton({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not simulate the payment.");
-      router.push(data.redeemUrl ? new URL(data.redeemUrl).pathname : fallbackHref);
+      // `successHref` is the same destination `data.redeemUrl` points at, minus
+      // the absolute origin and plus the query Stripe would have carried back.
+      router.push(successHref);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");

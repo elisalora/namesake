@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { boughtForSomeoneElse } from "@/lib/purchase";
 import EmailLinkForm from "@/components/EmailLinkForm";
 import RedeemPanel from "@/components/RedeemPanel";
 
@@ -8,8 +9,13 @@ import RedeemPanel from "@/components/RedeemPanel";
 // for yourself (details already known) and a gift someone bought for you
 // (details still to come). Whoever holds this link and signs in owns what it
 // grants — which is exactly what makes gifting work.
-export default async function RedeemPage(props: { params: Promise<{ code: string }> }) {
+export default async function RedeemPage(props: {
+  params: Promise<{ code: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const { code } = await props.params;
+  // Set by Stripe's success_url, so it's only ever the buyer's browser.
+  const cameFromCheckout = "bought" in (await props.searchParams);
 
   const purchase = await db.purchase.findUnique({ where: { redeemCode: code } });
   if (!purchase || purchase.kind === "extend") {
@@ -52,6 +58,54 @@ export default async function RedeemPage(props: { params: Promise<{ code: string
   const awaitingPayment = purchase.status === "pending";
 
   const user = await getCurrentUser();
+
+  // Checkout lands the buyer on this page, because for a boxed gift with nobody
+  // to email they're the one holding the code until the box changes hands. When
+  // the gift is going to a named address, that recipient has already been sent
+  // this link and the buyer needs a receipt, not a claim form — the form below
+  // would open, under the buyer's own account, the present they just paid for,
+  // and there is no way to un-redeem it.
+  //
+  // Two ways in. Signed in as the purchaser is certain — that person cannot
+  // redeem this anyway, `redeemPurchase` refuses it. Arriving with `?bought=1`
+  // is only a strong guess: it is set by Stripe, but a buyer can copy the URL
+  // out of their address bar and forward it, which is one of the ways a gift
+  // actually reaches someone. So the guessed case keeps a way through, and the
+  // server-side check stays the thing that protects the grant.
+  const giftToSomeoneElse = isGift && Boolean(purchase.recipientEmail);
+  const knownPurchaser = giftToSomeoneElse && user && boughtForSomeoneElse(purchase, user.email);
+  const presumedPurchaser = giftToSomeoneElse && cameFromCheckout && !knownPurchaser;
+
+  if (knownPurchaser || presumedPurchaser) {
+    return (
+      <Shell title="Your gift is on its way">
+        <p className="text-sm leading-relaxed text-ink-soft">
+          We&apos;re sending {purchase.recipientEmail} the link that opens it
+          {purchase.needsShipping ? ", and the box is being packed" : ""}. It&apos;s theirs to open —
+          they&apos;ll describe the journey themselves when they do.
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-ink-soft">
+          Nothing else to do. Your receipt is in your email.
+        </p>
+        <Link
+          href="/"
+          className="mt-5 inline-block rounded-full bg-sage-deep px-6 py-3 font-display text-white transition hover:bg-pewter"
+        >
+          Back to Namesake
+        </Link>
+        {presumedPurchaser && (
+          <p className="mt-5 text-xs leading-relaxed text-ink-soft">
+            Were you given this link?{" "}
+            <Link href={`/redeem/${code}`} className="underline">
+              Open your gift
+            </Link>
+            .
+          </p>
+        )}
+      </Shell>
+    );
+  }
+
   if (!user) {
     const suggested = (isGift ? purchase.recipientEmail : purchase.purchaserEmail) ?? "";
     return (

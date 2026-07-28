@@ -25,7 +25,15 @@ export async function POST(request: Request) {
     fromName: member.name,
     email: parsed.data.email || undefined,
   });
-  if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+  // 502 for a send that never reached a provider: nothing the parent typed is
+  // wrong, and telling them "sent" when it wasn't leaves their partner locked
+  // out of a journey they were told is waiting for them.
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.error },
+      { status: result.reason === "undeliverable" ? 502 : 400 },
+    );
+  }
 
   return NextResponse.json({ sent: true, email: result.email, devUrl: result.devUrl });
 }

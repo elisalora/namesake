@@ -86,12 +86,14 @@ export default async function DevCheckoutPage(props: { params: Promise<{ id: str
           ) : (
             <SimulatePaymentButton
               purchaseId={purchase.id}
-              fallbackHref={
+              // Mirrors Stripe's `success_url`, `?bought=1` included, so the
+              // simulated walkthrough lands where a real buyer lands.
+              successHref={
                 purchase.kind === "extend"
                   ? `/w/${purchase.workspaceId}?extended=1`
                   : purchase.kind === "keepsake"
                     ? `/w/${purchase.workspaceId}?keepsake=thanks`
-                    : `/redeem/${purchase.redeemCode}`
+                    : `/redeem/${purchase.redeemCode}?bought=1`
               }
             />
           )}
