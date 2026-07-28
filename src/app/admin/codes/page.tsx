@@ -20,7 +20,10 @@ export default async function CodesPage() {
   const codes = rows.map((p) => ({
     code: p.redeemCode,
     created: p.createdAt.toISOString(),
-    redeemed: p.status === "redeemed",
+    // `redeemedAt`, not the status: a comp that was later refunded or disputed
+    // still had its journey opened, and saying otherwise would offer to hand
+    // the code out again.
+    redeemed: Boolean(p.redeemedAt),
     babyLabel: p.workspace?.babyLabel ?? null,
     fromName: p.purchaserName,
     message: p.giftMessage,
