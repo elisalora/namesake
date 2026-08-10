@@ -160,11 +160,11 @@ export default function FaqPage() {
 
         <Answer q="Can we get a refund?">
           <p>
-            Fourteen days from purchase, for any reason — no form and no phone call.
+            Thirty days from purchase, for any reason — no form and no phone call.
           </p>
           <p>
-            Boxes are refundable until they&apos;re posted. The one thing that isn&apos;t is a
-            personalised keepsake once it&apos;s been made, because it has their name on it.{" "}
+            The one thing that isn&apos;t refundable is a keepsake once it&apos;s been made,
+            because it has their name on it.{" "}
             <Link
               href="/refunds"
               className="font-semibold text-sage-deep underline underline-offset-4 hover:text-pewter"
