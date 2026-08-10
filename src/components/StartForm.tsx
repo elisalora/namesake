@@ -40,14 +40,16 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
     // never got past the two checks above isn't an attempt to buy, it's a
     // half-filled form. Counting those would make the drop-off to step three
     // look like a payment problem when it was a typo.
-    track(FUNNEL.startSubmit, { tier: "self_serve", babyCount });
+    track(FUNNEL.startSubmit, { tier: "trial", babyCount });
     try {
-      const res = await fetch("/api/checkout", {
+      // No longer straight to Checkout. This mints a free grant and hands back
+      // the link that opens it — the same shape the paid path always had, and
+      // the reason the free-turn count can mean anything: the journey is born
+      // on the far side of a magic link, so its owner has a verified address.
+      const res = await fetch("/api/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          kind: "journey",
-          tier: "self_serve",
           draft: {
             you: { name: form.you.trim(), email: form.youEmail.trim() },
             partner: { name: form.partner.trim(), email: form.partnerEmail.trim() },
@@ -60,7 +62,6 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
-      // Off to Checkout. The journey itself is created when the payment clears.
       window.location.href = data.url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -133,15 +134,16 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
         disabled={loading}
         className="w-full rounded-full bg-sage-deep py-3.5 font-display text-lg text-white transition hover:bg-pewter disabled:opacity-60"
       >
-        {loading ? "Taking you to checkout…" : `Begin the journey · ${priceLabel}`}
+        {loading ? "One moment…" : "Begin the journey · free"}
       </button>
+      {/* Deliberately says nothing about refunds. The old line here promised
+          a refund window under a button that now takes no money, which is a
+          strange thing to read and a stranger thing to have written. The
+          refund terms belong under the button that charges — and that button
+          is the one at the wall. */}
       <p className="text-center text-xs leading-relaxed text-ink-soft">
-        Paid once — no subscription, nothing to cancel. You can add more time later if you need
-        it, and it&apos;s{" "}
-        <a href="/refunds" className="underline underline-offset-2 hover:text-sage-deep">
-          refundable
-        </a>{" "}
-        for fourteen days.
+        Free to begin — no card, and nothing to cancel. {priceLabel} continues it when you want
+        to keep going.
       </p>
     </form>
   );

@@ -21,6 +21,31 @@ export default async function ShowerPage(props: { params: Promise<{ id: string }
   const ws = await db.workspace.findUnique({ where: { id } });
   if (!ws) notFound();
 
+  // One of the two things a trial doesn't include. The link into here is
+  // already replaced with an explanation, so reaching this is either a typed
+  // URL or a bookmark from before — but the gate has to live at the page, not
+  // at the link, or it isn't a gate.
+  if (ws.isTrial) {
+    return (
+      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-12 text-center">
+        <div className="font-display text-3xl text-pewter">The shower card comes with the full journey</div>
+        <p className="mt-3 leading-relaxed text-ink-soft">
+          A printable card and a sign for the gift table, so the whole room can put a name forward
+          — it&apos;s part of {ws.babyLabel}&apos;s journey once you continue. Everything you&apos;ve
+          already written stays exactly where it is either way.
+        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href={`/w/${id}`}
+            className="rounded-full bg-sage-deep px-6 py-3 font-display text-white transition hover:bg-pewter"
+          >
+            Back to {ws.babyLabel}
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   const h = await headers();
   const configured = process.env.NAMESAKE_URL?.trim().replace(/\/+$/, "");
   const origin =

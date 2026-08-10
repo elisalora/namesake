@@ -16,6 +16,31 @@ export default async function KeepsakePage(props: { params: Promise<{ id: string
 
   const givenNames = ws?.names.filter((n) => n.role !== "middle") ?? [];
 
+  // The other thing a trial doesn't include.
+  //
+  // This page has no session check by design — a keepsake you can't send to a
+  // grandparent isn't a keepsake — so the gate is on the journey rather than
+  // on the reader, and it lifts for everyone the moment anybody pays. Checked
+  // before the "not ready yet" branch below, because a trial that hasn't
+  // chosen a name should hear the true reason rather than a nearly-true one.
+  if (ws?.isTrial) {
+    return (
+      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-12 text-center">
+        <div className="font-display text-3xl text-pewter">The keepsake comes with the full journey</div>
+        <p className="mt-3 leading-relaxed text-ink-soft">
+          The name, the story of why, and the day it was chosen — printed, for the baby book.
+          It&apos;s waiting at the end of {ws.babyLabel}&apos;s journey once it&apos;s continued.
+        </p>
+        <Link
+          href={`/w/${id}`}
+          className="mt-6 inline-block rounded-full bg-sage-deep px-6 py-3 font-display text-white transition hover:bg-pewter"
+        >
+          Back to {ws.babyLabel}
+        </Link>
+      </main>
+    );
+  }
+
   if (!ws || ws.status !== "decided" || givenNames.length === 0) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center text-ink-soft">

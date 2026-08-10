@@ -43,13 +43,82 @@ endpoint. It prints one line per check and exits non-zero on the first failure.
 
 Point it at a **scratch database** — it writes rows and deliberately doesn't clean up,
 because a failing check is much easier to understand when the rows that caused it are
-still there. Four of its checks drive real HTTP; they're skipped unless a server is
-running and you tell it where:
+still there. Most of it drives real HTTP, including the whole free tier end to end; those
+checks are skipped unless a server is running and you tell it where:
 
 ```bash
 npm run dev                                    # in another terminal
 DATABASE_URL=… PROBE_ORIGIN=http://localhost:3000 npm run probe
 ```
+
+The consultant answers with mock replies when `ANTHROPIC_API_KEY` is unset, which is what
+lets the trial be walked all ten turns without spending anything.
+
+One check needs the opposite — a consultant that fails outright — so it lives behind a flag
+and its own server. It's the one that proves a turn is handed back when the model never says
+a word, and it can't be reached with a working key:
+
+```bash
+DATABASE_URL=… ANTHROPIC_API_KEY=sk-ant-deliberately-invalid npx next dev -p 3113
+DATABASE_URL=… PROBE_ORIGIN=http://localhost:3113 PROBE_BROKEN_MODEL=1 npm run probe
+```
+
+## The free tier
+
+Starting a journey costs nothing. What a **trial** journey doesn't include is exactly three
+things — the numbers live in `src/lib/trial.ts`:
+
+1. **Ten consultant turns per person**, spent for good. On the `User`, not the workspace:
+   per-workspace would renew the trial every time somebody started a new journey, which is
+   a limit that isn't one.
+2. **The printable shower card** (`/w/[id]/shower`).
+3. **The keepsake** (`/w/[id]/keepsake`).
+
+Everything else is the whole product. Shortlist, ratings, notes, the veto, the partner's
+seat, the family suggestion link, and the entire conversation they've already had — none of
+it is ever taken away, and the wall says so in as many words.
+
+Two rules that are easy to get wrong and expensive to discover from a support email:
+
+- **Free turns are only spent where nobody has paid.** Otherwise a day-one buyer quietly
+  burns their lifetime ten inside the journey they paid for.
+- **A turn the consultant never answers is given back.** Only when it produced nothing at
+  all — a reply that died mid-sentence is a reply, and it's in the transcript.
+
+The free path is a `Purchase` like everything else (`createTrialGrant`), born already paid
+and worth nothing. That isn't ceremony: in this product a journey cannot come into being
+except by redeeming a grant, so the workspace is created on the far side of a magic link and
+its owner has a **verified address** for the count to hang on. Move the journey to this side
+of that link and a fresh email is a fresh allowance.
+
+"Lifetime" is an internal word meaning *not per journey*. A second address is a second
+allowance; that leak is known, costs about 65¢, and is deliberately undefended. No copy in
+the product claims otherwise.
+
+Buying it is `kind: "upgrade"` on `/api/checkout` — fulfilled as an extension of the journey
+they're standing in rather than a second empty one, at the same price as `self_serve`. One
+payment clears `isTrial`, which is why the wall can honestly say *"whenever either of you
+continues, it opens for both of you"*: the window has always been a fact about the workspace.
+
+**A comp from `/admin/codes` is not a trial.** It grants the whole product, deliberately.
+
+## The refund term is guarded in two places, and they are not the same guard
+
+It is written out in prose on four surfaces — `/refunds`, the FAQ answer, `GiftForm` and
+`RefundNote`. Nothing used to make them agree, and they didn't: five live surfaces promised
+fourteen days against a thirty-day policy for twelve days, caught only because somebody went
+looking.
+
+- **`npm run probe`** reads the *rendered pages*. That is the truer question — a string that
+  never reaches a screen is not a promise — but it needs a running server, so it can never
+  run inside a build.
+- **`scripts/preflight.mjs`** reads the *source*. Weaker, and it is the one that runs: it is
+  the first thing `npm run build` does, and on a **production** build a disagreement refuses
+  the build outright.
+
+Deliberately not fatal on a preview or locally, where it is a loud warning instead. A
+preview has no customers, and blocking one would stop anybody clicking through the branch to
+look at the very copy in question.
 
 ## Measuring the funnel
 
@@ -59,11 +128,19 @@ Vercel Web Analytics, four events, named once in `src/lib/funnel.ts`:
 |---|---|
 | `landing_view` | the storefront, on first paint |
 | `start_submit` | the start form, once it has passed validation |
-| `checkout_created` | `/api/checkout`, once there is somewhere to pay |
+| `checkout_created` | `/api/checkout` (and `/api/start`), once there is somewhere to go |
+| `wall_reached` | the turn that spends somebody's **last** free conversation |
 | `purchase_fulfilled` | `fulfillPurchase`, on a first-time grant only |
 
 Only the last one means revenue. It is deliberately silent on a repeat webhook, so a
 Stripe retry can't inflate it.
+
+**The ratio worth watching is `purchase_fulfilled / wall_reached`.** Without the wall step,
+a low purchase count is ambiguous between *nobody engaged* and *everybody engaged and
+refused to pay* — and those have opposite fixes. `wall_reached` fires on the turn that takes
+the count to its limit, not on the refusal afterwards and not on the wall rendering, because
+both of those repeat and this has to be a denominator. The `RETURNING` on the spend is what
+makes it exactly once even for two concurrent turns.
 
 **All four are no-ops off Vercel** — the browser half loads no script, and the server
 half prints the event to the console instead of sending it. That is how you check a call

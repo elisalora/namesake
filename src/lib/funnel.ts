@@ -20,8 +20,20 @@ export const FUNNEL = {
   startSubmit: "start_submit",
   /// A Purchase row exists and there is somewhere to pay. Not a sale.
   checkoutCreated: "checkout_created",
-  /// Money cleared and the grant was applied. This is the only one of the four
-  /// that means revenue.
+  /// Somebody spent the last of their free consultant turns.
+  ///
+  /// The step the free tier added, and the one that makes the rest legible.
+  /// Without it a low purchase count is ambiguous between "nobody engaged"
+  /// and "everybody engaged and refused to pay", and those have opposite
+  /// fixes — one is a product problem, the other is a price problem.
+  ///
+  /// Fires on the turn that takes the count to its limit, not on the refusal
+  /// afterwards and not on the wall rendering: both of those repeat, and this
+  /// has to be a denominator.
+  wallReached: "wall_reached",
+  /// Money cleared and the grant was applied. The only one here that means
+  /// revenue — and the numerator of the ratio worth watching, over
+  /// `wallReached`.
   purchaseFulfilled: "purchase_fulfilled",
 } as const;
 
