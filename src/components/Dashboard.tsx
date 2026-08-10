@@ -19,6 +19,7 @@ export default function Dashboard({
   me,
   origin,
   showWelcome,
+  upgradePrice,
 }: {
   initial: WorkspaceState;
   me: Me;
@@ -27,6 +28,11 @@ export default function Dashboard({
   /// effect meant a flash of empty URLs.
   origin: string;
   showWelcome: boolean;
+  /// What continuing a trial costs, formatted, from the server. Every price
+  /// is env-overridable and Next only hands `NEXT_PUBLIC_` variables to the
+  /// browser, so reading `lib/pricing.ts` from a client component would fall
+  /// back to the hard-coded default the moment a price is changed in Vercel.
+  upgradePrice: string;
 }) {
   const [ws, setWs] = useState(initial);
   const [welcome, setWelcome] = useState(showWelcome);
@@ -133,12 +139,17 @@ export default function Dashboard({
       <WindowBanner ws={ws} />
 
       {decided && ws.chosen.length > 0 && (
-        <DecidedBanner ws={ws} origin={origin} onChanged={refresh} />
+        <DecidedBanner ws={ws} origin={origin} onChanged={refresh} upgradePrice={upgradePrice} />
       )}
 
       {/* The decision moment is peak emotion — the one place a made-to-order
-          keepsake sells itself. With twins it's two. */}
-      {decided && ws.chosen.length > 0 && <KeepsakeUpsell ws={ws} />}
+          keepsake sells itself. With twins it's two.
+          Not on a trial: the keepsake those add-ons are printed from is the
+          thing a trial doesn't include, and selling somebody a blanket with a
+          name on it while the page that shows them the name is closed is the
+          wrong order to do things in. The banner above asks for the journey
+          instead. */}
+      {decided && ws.chosen.length > 0 && !ws.isTrial && <KeepsakeUpsell ws={ws} />}
 
       {/* Half-named. The one thing that has to stay in front of them from here
           on: who already has a name, so every name still being weighed is
@@ -170,7 +181,7 @@ export default function Dashboard({
 
       <main className="mx-auto grid w-full max-w-7xl flex-1 gap-5 px-5 py-4 lg:grid-cols-2 lg:py-5">
         <div className={`h-[calc(100vh-11rem)] lg:h-[calc(100vh-8rem)] ${mobileTab === "chat" ? "block" : "hidden"} lg:block`}>
-          <ChatPanel ws={ws} me={me} onChanged={refresh} />
+          <ChatPanel ws={ws} me={me} onChanged={refresh} upgradePrice={upgradePrice} />
         </div>
         <div
           className={`scroll-soft h-[calc(100vh-11rem)] overflow-y-auto lg:h-[calc(100vh-8rem)] lg:pr-1 ${
@@ -265,10 +276,12 @@ function DecidedBanner({
   ws,
   origin,
   onChanged,
+  upgradePrice,
 }: {
   ws: WorkspaceState;
   origin: string;
   onChanged: () => void;
+  upgradePrice: string;
 }) {
   const many = ws.chosen.length > 1;
   return (
@@ -286,18 +299,36 @@ function DecidedBanner({
           </div>
         ))}
         <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <Link
-            href={`/w/${ws.id}/keepsake`}
-            className="rounded-full bg-gold px-5 py-2.5 font-semibold text-white transition hover:brightness-95"
-          >
-            View the keepsake
-          </Link>
-          <button
-            onClick={() => navigator.clipboard.writeText(`${origin}/w/${ws.id}/keepsake`)}
-            className="rounded-full border border-gold/60 px-5 py-2.5 font-semibold text-[#8a6d1f]"
-          >
-            Copy keepsake link
-          </button>
+          {ws.isTrial ? (
+            // They chose a name on a trial. Say what the keepsake is and what
+            // it takes, at the one moment they most want it — rather than a
+            // button that walks them into a locked page.
+            <div className="w-full">
+              <p className="mx-auto max-w-xl text-sm leading-relaxed text-ink-soft">
+                There&apos;s a keepsake at the end of this — {many ? "their names" : "the name"},
+                the story of why, and the day you chose it, printed for the baby book. It comes
+                with the full journey.
+              </p>
+              <div className="mt-3">
+                <UpgradeInline workspaceId={ws.id} label={`Continue · ${upgradePrice}`} />
+              </div>
+            </div>
+          ) : (
+            <>
+              <Link
+                href={`/w/${ws.id}/keepsake`}
+                className="rounded-full bg-gold px-5 py-2.5 font-semibold text-white transition hover:brightness-95"
+              >
+                View the keepsake
+              </Link>
+              <button
+                onClick={() => navigator.clipboard.writeText(`${origin}/w/${ws.id}/keepsake`)}
+                className="rounded-full border border-gold/60 px-5 py-2.5 font-semibold text-[#8a6d1f]"
+              >
+                Copy keepsake link
+              </button>
+            </>
+          )}
           {/* Nothing is final until the birth certificate. Reopening puts the
               name (or names) back on the shortlist rather than pretending the
               decision can't be revisited. */}
@@ -449,6 +480,66 @@ function CopyRow({ label, url }: { label: string; url: string }) {
   );
 }
 
+/// The upgrade, at the decision. Same route the wall in `ChatPanel` posts to —
+/// there is one way to buy a trial journey and this is it.
+function UpgradeInline({ workspaceId, label }: { workspaceId: string; label: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <span className="inline-flex flex-wrap items-center justify-center gap-2">
+      <button
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            const res = await fetch("/api/checkout", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ kind: "upgrade", workspaceId }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Could not start checkout.");
+            window.location.href = data.url;
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Something went wrong.");
+            setBusy(false);
+          }
+        }}
+        disabled={busy}
+        className="rounded-full bg-gold px-5 py-2.5 font-semibold text-white transition hover:brightness-95 disabled:opacity-60"
+      >
+        {busy ? "One moment…" : label}
+      </button>
+      {error && <span className="text-xs text-sage-deep">{error}</span>}
+    </span>
+  );
+}
+
+/// A couple recruiting their own buyer, in their own words.
+///
+/// Not a link to `/gift` — that page is written for the buyer, and the couple
+/// isn't the buyer. A copyable sentence, using the same `CopyRow` that sits
+/// one section above it asking family for ideas, because the motion is the
+/// same one: paste this into your own messages.
+///
+/// It sits beside the other share rows from the first day rather than
+/// appearing at the wall, which is the point. Somebody who has just been told
+/// they are out of conversations is the least persuasive person to be sending
+/// this sentence.
+function GiftLineRow({ origin }: { origin: string }) {
+  // The bare host, the way somebody would type it into a message — but from
+  // the origin rather than written out, so a preview deploy doesn't hand
+  // people a link to production and a local one doesn't hand them a link that
+  // 404s.
+  const host = origin.replace(/^https?:\/\//, "");
+  return (
+    <CopyRow
+      label="Let someone gift the rest (optional)"
+      url={`We started choosing a name for the baby — this is where we're doing it, if you ever wanted to give something odd and lovely. ${host}/gift`}
+    />
+  );
+}
+
 /// The state of the paid window. Silent while there's plenty of time left,
 /// gentle as it approaches, and plain once it's closed — never alarming, and
 /// never suggesting anything they wrote is at risk.
@@ -534,6 +625,7 @@ function WelcomeModal({
         {ws.pendingSeat && <InviteByEmail ws={ws} />}
         {inviteUrl && <CopyRow label="Or hand them this link" url={inviteUrl} />}
         <CopyRow label="Ask family & friends for ideas (optional)" url={familyUrl} />
+        {ws.isTrial && <GiftLineRow origin={origin} />}
       </div>
       <button onClick={onClose} className="mt-6 w-full rounded-full bg-sage-deep py-3 font-display text-white transition hover:bg-pewter">
         Start naming
@@ -565,18 +657,33 @@ function ShareModal({
         {ws.pendingSeat && <InviteByEmail ws={ws} />}
         {ws.pendingSeat && inviteUrl && <CopyRow label="Or hand them this link" url={inviteUrl} />}
         <CopyRow label="Family & friends suggestion link" url={familyUrl} />
-        <Link
-          href={`/w/${ws.id}/shower`}
-          className="flex items-center justify-between rounded-2xl border border-line bg-paper p-4 transition hover:border-sage"
-        >
-          <span>
+        {ws.isTrial && <GiftLineRow origin={origin} />}
+        {ws.isTrial ? (
+          // One of the two things a trial doesn't include. Shown rather than
+          // hidden, on purpose: this is the shower card, the couple is
+          // planning a shower, and knowing it exists is most of why anyone
+          // continues. A missing feature persuades nobody.
+          <div className="rounded-2xl border border-line bg-butter-soft/50 p-4">
             <span className="block text-sm font-semibold text-ink">Having a shower?</span>
             <span className="mt-0.5 block text-sm text-ink-soft">
-              A printable card and sign, so the whole room can suggest names.
+              A printable card and sign, so the whole room can suggest names — that one comes with
+              the full journey, along with the keepsake at the end.
             </span>
-          </span>
-          <span className="ml-3 shrink-0 text-ink-soft">→</span>
-        </Link>
+          </div>
+        ) : (
+          <Link
+            href={`/w/${ws.id}/shower`}
+            className="flex items-center justify-between rounded-2xl border border-line bg-paper p-4 transition hover:border-sage"
+          >
+            <span>
+              <span className="block text-sm font-semibold text-ink">Having a shower?</span>
+              <span className="mt-0.5 block text-sm text-ink-soft">
+                A printable card and sign, so the whole room can suggest names.
+              </span>
+            </span>
+            <span className="ml-3 shrink-0 text-ink-soft">→</span>
+          </Link>
+        )}
       </div>
       <button onClick={onClose} className="mt-6 w-full rounded-full border border-line py-2.5 text-pewter">
         Done

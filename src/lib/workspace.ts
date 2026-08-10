@@ -3,12 +3,20 @@ import { analyzeName, type Sibling } from "@/lib/nameChecks";
 import { hasExpired } from "@/lib/session";
 import { slotLabel } from "@/lib/babies";
 import { turnHolder } from "@/lib/turn";
+import { turnsLeft } from "@/lib/trial";
 
 export async function getWorkspaceState(workspaceId: string) {
   const ws = await db.workspace.findUnique({
     where: { id: workspaceId },
     include: {
-      members: { orderBy: { createdAt: "asc" } },
+      members: {
+        orderBy: { createdAt: "asc" },
+        // Only the count. The wall has to say "and {partner} has {k}
+        // conversations left", so each seat carries its own person's
+        // remaining turns — and nothing else about that person: no email, no
+        // id, nothing this payload didn't already contain.
+        include: { user: { select: { freeTurnsUsed: true } } },
+      },
       names: {
         orderBy: { createdAt: "desc" },
         include: {
@@ -154,6 +162,10 @@ export async function getWorkspaceState(workspaceId: string) {
     dueDate: ws.dueDate ? ws.dueDate.toISOString() : null,
     expiresAt: ws.expiresAt ? ws.expiresAt.toISOString() : null,
     expired: hasExpired(ws),
+    /// Nobody has paid for this journey yet, so the consultant costs each
+    /// parent one of their free turns and the shower card and keepsake are
+    /// closed. See lib/trial.ts.
+    isTrial: ws.isTrial,
     // Computed here rather than in the client so rendering stays a pure
     // function of its props — the poll keeps it fresh.
     daysLeft: ws.expiresAt
@@ -180,6 +192,15 @@ export async function getWorkspaceState(workspaceId: string) {
       color: m.color,
       isOwner: m.isOwner,
       joined: Boolean(m.userId),
+      /// Free consultant turns this parent has left, or null when the
+      /// question doesn't apply — a journey somebody has paid for, or a seat
+      /// nobody has claimed yet.
+      ///
+      /// Per seat rather than one number on the journey, because this is the
+      /// one quantity here that isn't shared. Two parents look at the same
+      /// screen from different accounts and are in different states, so the
+      /// wall has to render per viewer; that only works if the data does.
+      freeTurnsLeft: ws.isTrial && m.user ? turnsLeft(m.user.freeTurnsUsed) : null,
     })),
     // The seat still waiting on someone. Only ever reaches a signed-in member
     // of this journey, so it's safe to carry the claim token.

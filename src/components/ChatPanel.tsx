@@ -5,6 +5,7 @@ import type { WorkspaceState } from "@/lib/workspace";
 import { openingMessage, CONVERSATION_STARTERS, MULTIPLES_STARTERS } from "@/lib/opening";
 import { namedParents } from "@/lib/seat";
 import { babiesLabel, slots } from "@/lib/babies";
+import { NUDGE_AT_REMAINING } from "@/lib/trial";
 
 type Me = { id: string; name: string; color: string };
 
@@ -33,10 +34,21 @@ export default function ChatPanel({
   ws,
   me,
   onChanged,
+  upgradePrice,
 }: {
   ws: WorkspaceState;
   me: Me;
   onChanged: () => void | Promise<void>;
+  /// What continuing costs, formatted, from the server.
+  ///
+  /// Handed down rather than read from `lib/pricing.ts` here, and the reason
+  /// is a trap rather than a preference: every price in that file is
+  /// env-overridable, and Next only exposes `NEXT_PUBLIC_` variables to the
+  /// browser. Imported into a client component it would quietly fall back to
+  /// the hard-coded default — right today, and silently wrong the first time
+  /// somebody changes a price in Vercel, on the one screen in the product
+  /// that is asking for money.
+  upgradePrice: string;
 }) {
   // The transcript is whatever the server says it is.
   //
@@ -73,6 +85,34 @@ export default function ChatPanel({
     othersTurn?.name ?? ws.members.find((m) => m.id !== me.id && m.joined)?.name ?? "Your partner";
   const decided = ws.status === "decided";
   const multiple = ws.babyCount > 1;
+
+  // The free trial, from this viewer's chair.
+  //
+  // Everything below is per *person*, which is the whole reason it can't live
+  // where the expired-journey banner lives: `ws.expired` is a fact about the
+  // workspace and both parents meet it at the same moment, but free turns run
+  // out one parent at a time. The two of them are looking at the same screen
+  // from different accounts and are routinely in different states.
+  const mySeat = ws.members.find((m) => m.id === me.id);
+  const myTurnsLeft = mySeat?.freeTurnsLeft ?? null;
+  const partner = ws.members.find((m) => m.id !== me.id && m.joined) ?? null;
+  const partnerTurnsLeft = partner?.freeTurnsLeft ?? null;
+  const outOfTurns = myTurnsLeft === 0;
+  // Somebody who spent their ten elsewhere and has just opened a brand-new
+  // journey. "That's the free trial" would read as a bug to them — they have
+  // not typed a word here — so this state gets its own sentence, and it is
+  // the first thing some people will ever see of the product.
+  const neverStarted = outOfTurns && ws.messages.length === 0;
+  const showNudge =
+    myTurnsLeft !== null && myTurnsLeft > 0 && myTurnsLeft <= NUDGE_AT_REMAINING && !decided;
+  const namedNames = ws.names.filter((n) => n.role !== "middle").length;
+  const partnerRatings = partner
+    ? ws.names.filter((n) => n.ratings.some((r) => r.memberId === partner.id)).length
+    : 0;
+  const partnerName = partner?.name ?? "your partner";
+  // Composing is pointless once the composer is closed for good, and the two
+  // reasons it can be closed read differently.
+  const composerClosed = ws.expired || outOfTurns;
   const opening = openingMessage({
     babyLabel: babiesLabel(ws.babyLabel, ws.babyCount),
     parents: namedParents(ws.members),
@@ -118,6 +158,10 @@ export default function ChatPanel({
     // yet — the server would refuse it anyway, and this way pressing Enter
     // early costs them nothing.
     if (othersTurn) return;
+    // The server refuses this anyway; stopping here means a spent trial never
+    // shows the composer clearing and a bubble appearing before it's taken
+    // back again.
+    if (composerClosed) return;
     setInput("");
     setChips([]);
     setError(null);
@@ -143,7 +187,14 @@ export default function ChatPanel({
           res.status === 409
             ? `${held ? decodeURIComponent(held) : otherName} is asking something — yours will send once the consultant has answered.`
             : res.status === 402
-              ? "Your window has closed. Everything here is still yours to read."
+              ? // Two different 402s now, and they are different facts. One is
+                // about the journey and both parents are in it; the other is
+                // about this person alone. The refresh is what paints the
+                // wall — this line only has to cover the second or two before
+                // the poll catches up.
+                (await res.text()) === "free_trial_used"
+                ? "That was your last free conversation — everything here is still yours to read."
+                : "Your window has closed. Everything here is still yours to read."
               : "That didn't send. Nothing's lost — try once more.",
         );
         return;
@@ -256,6 +307,28 @@ export default function ChatPanel({
         </div>
       )}
 
+      {/* The counter, from the first turn.
+          Same pinned strip the twins reminder uses, for the same reason: it
+          has to stay in view rather than scroll away. A visible limit creates
+          anticipation; a limit somebody discovers at the wall creates a
+          refund request — which is also why this appears at turn one rather
+          than turn eight. */}
+      {myTurnsLeft !== null && myTurnsLeft > 0 && !decided && (
+        <div className="border-b border-line bg-butter-soft/50 px-5 py-2.5 text-xs leading-relaxed text-[#8a6d1f]">
+          {myTurnsLeft === 1 ? (
+            <>
+              <span className="font-semibold">One free conversation left.</span> Make it count, or
+              don&apos;t — it&apos;ll keep.
+            </>
+          ) : (
+            <>
+              <span className="font-semibold">{myTurnsLeft} free conversations left.</span> No rush
+              — they don&apos;t expire.
+            </>
+          )}
+        </div>
+      )}
+
       <div
         ref={scrollRef}
         onScroll={(e) => {
@@ -306,6 +379,45 @@ export default function ChatPanel({
           </Bubble>
         )}
 
+        {/* The nudge, two conversations out.
+            Inline and after the reply, never a modal — an overlay at the
+            emotional high of this product is the version that reads as an
+            ambush. The argument is carried by the two numbers rather than by
+            an adjective: what they have already built is the whole case, and
+            saying "you've built something special here" out loud lands
+            worse than showing it. */}
+        {showNudge && !streaming && (
+          <div className="animate-rise rounded-2xl border border-line bg-butter-soft/60 px-4 py-3.5 text-sm leading-relaxed text-ink">
+            {namedNames > 0 ? (
+              <p>
+                You&apos;ve got <span className="font-semibold">{namedNames} names</span> saved
+                {partner && partnerRatings > 0 && (
+                  <>
+                    {" "}
+                    and {partnerName} has weighed in on {partnerRatings} of them
+                  </>
+                )}
+                . {myTurnsLeft === 1 ? "One conversation" : `${myTurnsLeft} conversations`} left in
+                the free trial — then this all stays exactly where it is, and you can pick it up
+                whenever.
+              </p>
+            ) : (
+              // Not optional. Plenty of couples talk for eight turns before
+              // saving a single name, and the version above would tell them
+              // they have nought of something.
+              <p>
+                {myTurnsLeft === 1 ? "One conversation" : `${myTurnsLeft} conversations`} left in
+                the free trial. Whatever you&apos;ve talked about stays right here — nothing goes
+                away when the count runs out.
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <UpgradeButton workspaceId={ws.id} label={`Keep going · ${upgradePrice}`} />
+              <span className="text-xs text-ink-soft">Or ask someone to gift it</span>
+            </div>
+          </div>
+        )}
+
         {error && <div className="pl-1 text-xs text-ink-soft">{error}</div>}
 
         {chips.length > 0 && !streaming && (
@@ -338,7 +450,57 @@ export default function ChatPanel({
         )}
       </div>
 
-      {!decided && (
+      {/* The wall.
+          Three states, because ten-each makes this a fact about a person
+          rather than about the journey. What it does *not* do is as
+          deliberate as what it does: no second countdown, no "offer expires",
+          no discount for acting now. The one thing it promises is that
+          nothing was taken away, and that promise is the entire reason
+          somebody comes back. */}
+      {!decided && outOfTurns && (
+        <div className="border-t border-line bg-butter-soft/60 p-4">
+          <p className="text-sm leading-relaxed text-ink-soft">
+            {neverStarted ? (
+              // They have typed nothing here. "That's the free trial" would
+              // read as a bug, and for some people this is the first thing
+              // they ever see of the product — so it reads like a price
+              // rather than like a door closing.
+              <>
+                <span className="font-display text-base text-pewter">
+                  You&apos;ve used your free conversations.
+                </span>{" "}
+                Journeys are {upgradePrice} and this one&apos;s ready when you are — the
+                consultant, the shortlist, a seat for your partner, and the keepsake at the end.
+              </>
+            ) : partnerTurnsLeft !== null && partnerTurnsLeft > 0 ? (
+              // The common case: almost nobody spends theirs in lockstep. The
+              // last sentence is the strongest one in the flow and it is
+              // literally true — the window is a fact about the workspace, so
+              // one payment has always covered both seats.
+              <>
+                <span className="font-display text-base text-pewter">That&apos;s your ten.</span>{" "}
+                Everything here is still yours to read, and {partnerName} has {partnerTurnsLeft}{" "}
+                {partnerTurnsLeft === 1 ? "conversation" : "conversations"} left. Whenever either
+                of you continues for {upgradePrice}, it opens for both of you.
+              </>
+            ) : (
+              <>
+                <span className="font-display text-base text-pewter">
+                  That&apos;s the free trial{partner ? ", for both of you" : ""}.
+                </span>{" "}
+                Everything here is still yours to read — the conversation, your shortlist
+                {partner ? `, ${partnerName}'s ratings` : ""}. Pick it up whenever you&apos;re
+                ready.
+              </>
+            )}
+          </p>
+          <div className="mt-3">
+            <UpgradeButton workspaceId={ws.id} label={`Continue · ${upgradePrice}`} />
+          </div>
+        </div>
+      )}
+
+      {!decided && !outOfTurns && (
         <div className="border-t border-line p-3">
           {/* Say who has the floor rather than leaving a dead send button.
               Typing stays open — they can be composing their thought while the
@@ -360,7 +522,7 @@ export default function ChatPanel({
                 }
               }}
               rows={1}
-              disabled={ws.expired}
+              disabled={composerClosed}
               placeholder={
                 ws.expired
                   ? "Your window has closed — everything here is still yours to read."
@@ -370,7 +532,7 @@ export default function ChatPanel({
             />
             <button
               onClick={() => send(input)}
-              disabled={ws.expired || streaming || Boolean(othersTurn) || !input.trim()}
+              disabled={composerClosed || streaming || Boolean(othersTurn) || !input.trim()}
               className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sage-deep text-white transition hover:bg-pewter disabled:opacity-50"
               aria-label="Send"
             >
@@ -401,6 +563,45 @@ function Bubble({ role, author, color, children }: { role: string; author?: stri
         </div>
       </div>
     </div>
+  );
+}
+
+/// The one button in the trial that takes money. Posts the `upgrade` kind,
+/// which buys the journey they are standing in rather than building a second
+/// empty one beside it.
+function UpgradeButton({ workspaceId, label }: { workspaceId: string; label: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function go() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "upgrade", workspaceId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not start checkout.");
+      window.location.href = data.url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <button
+        onClick={go}
+        disabled={busy}
+        className="rounded-full bg-sage-deep px-5 py-2 text-sm font-semibold text-white transition hover:bg-pewter disabled:opacity-60"
+      >
+        {busy ? "One moment…" : label}
+      </button>
+      {error && <span className="text-xs text-sage-deep">{error}</span>}
+    </span>
   );
 }
 

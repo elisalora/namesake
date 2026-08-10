@@ -18,6 +18,21 @@ model User {
   name      String?
   createdAt DateTime @default(now())
 
+  /// Free consultant turns this person has spent, ever, across every journey.
+  ///
+  /// A stored count rather than something derived from ChatMessage, and the
+  /// difference matters. Derived, the query would have to be "messages this
+  /// person wrote in journeys that nobody has paid for" — and the second half
+  /// of that is *mutable*. Somebody who upgrades a journey would have its
+  /// turns stop counting, handing them their free allowance back to spend
+  /// somewhere else. Spending a free turn is a thing that happened; it is not
+  /// a fact about the current state of a workspace.
+  ///
+  /// Only ever goes up, except when the consultant fails before saying a word
+  /// — see `api/chat/route.ts`. There is no renewal, deliberately: renewal is
+  /// the per-journey loophole with extra steps.
+  freeTurnsUsed Int @default(0)
+
   members  Member[]
   sessions Session[]
 }
@@ -157,6 +172,20 @@ model Workspace {
   dueDate     DateTime?
   status      String    @default("active") // active | decided | archived
   expiresAt   DateTime? // end of the paid window; null = grandfathered, no expiry
+  /// Nobody has paid for this journey yet.
+  ///
+  /// A trial journey is complete except in three places: the consultant costs
+  /// each parent one of their free turns, the printable shower card is closed,
+  /// and so is the keepsake. Everything they write — shortlist, ratings, notes,
+  /// the conversation itself — is theirs on a trial exactly as it is on a paid
+  /// journey, and none of it is ever taken away.
+  ///
+  /// A flag rather than "are there any purchases attached", because there is
+  /// exactly one function that applies a grant (`fulfillPurchase`) and one
+  /// that creates a journey from one (`redeemPurchase`). Two writers, one
+  /// answer, nothing to keep in sync — where the derived version would have to
+  /// be recomputed correctly by every future reader.
+  isTrial     Boolean   @default(false)
   suggestSlug String    @unique // public slug for the family suggestion link
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

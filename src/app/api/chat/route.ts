@@ -6,6 +6,7 @@ import { openingMessage } from "@/lib/opening";
 import { claimTurn, releaseTurn, turnHolder } from "@/lib/turn";
 import { namedParents } from "@/lib/seat";
 import { babiesLabel, slotLabel, slots } from "@/lib/babies";
+import { FREE_TURNS } from "@/lib/trial";
 
 const schema = z.object({
   workspaceId: z.string(),
@@ -43,6 +44,54 @@ export async function POST(request: Request) {
     }
   }
 
+  // The free trial, spent one turn at a time.
+  //
+  // After the per-journey cap above, not before: a turn the cap is about to
+  // refuse is not a turn anybody got, and charging one of ten for it would be
+  // the same unfairness the refund below exists to undo.
+  //
+  // Read the journey first. A turn only costs an allowance where nobody has
+  // paid — otherwise somebody who buys on day one quietly burns their lifetime
+  // ten inside the journey they paid for, and finds nothing left if they ever
+  // start a second. That is the sort of thing you discover from a support
+  // email rather than from a test.
+  const journey = await db.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { isTrial: true },
+  });
+  if (!journey) return new Response("not_found", { status: 404 });
+
+  // Set once a turn has actually been taken off this person, so the failure
+  // path below can put it back.
+  let spentFreeTurn = false;
+
+  if (journey.isTrial) {
+    // `getWritableMember` found this seat by the signed-in user's id, so the
+    // seat has one. The `??` is the type system's question, not a real case.
+    const userId = member.userId ?? "";
+
+    // A conditional update rather than read-then-write: two tabs, or two taps
+    // on a slow phone, would otherwise both read nine and both spend the
+    // tenth. The same shape the codebase already uses to spend a login token
+    // and to spend a purchase — one statement, and the database decides who
+    // won.
+    const spent = await db.user.updateMany({
+      where: { id: userId, freeTurnsUsed: { lt: FREE_TURNS } },
+      data: { freeTurnsUsed: { increment: 1 } },
+    });
+    if (spent.count === 0) {
+      // Its own code, not the 402 an expired journey gets. The two are
+      // different sentences on screen and — more to the point — different
+      // states: this journey is not over, this *person* is out of turns, and
+      // their partner may still have some.
+      return new Response("free_trial_used", {
+        status: 402,
+        headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+      });
+    }
+    spentFreeTurn = true;
+  }
+
   // Take the conversation before reading it, not after.
   //
   // Everything the consultant is about to be told is built from one snapshot
@@ -56,7 +105,29 @@ export async function POST(request: Request) {
   // shouldn't get two consultants talking over each other; the other screen is
   // already showing that a question is in flight, and this only has to catch
   // the second or two before it knows.
+  /// Give a free turn back. Only ever called when the consultant produced
+  /// nothing whatsoever — a turn that was refused before it started, or one
+  /// where the model never said a word. Charging somebody one of ten for our
+  /// own outage is the kind of small unfairness nobody reports and everybody
+  /// remembers.
+  ///
+  /// Guarded above zero so a double refund can't run the count backwards into
+  /// a free turn nobody was given.
+  const refundFreeTurn = async () => {
+    if (!spentFreeTurn) return;
+    spentFreeTurn = false;
+    await db.user
+      .updateMany({
+        where: { id: member.userId ?? "", freeTurnsUsed: { gt: 0 } },
+        data: { freeTurnsUsed: { decrement: 1 } },
+      })
+      .catch((err) => console.error("[namesake] could not return a free turn", err));
+  };
+
   if (!(await claimTurn(workspaceId, member.id))) {
+    // Refused before a word was said: their question is still in the box and
+    // they will send it again in a moment.
+    await refundFreeTurn();
     // Say who actually has it. The screen can otherwise only guess — "the
     // other parent" — which is right in the ordinary race and wrong for
     // someone who left a turn running in another tab, and telling one of them
@@ -81,10 +152,12 @@ export async function POST(request: Request) {
     opened = await openTurn(workspaceId, message, member);
   } catch (err) {
     await releaseTurn(workspaceId, member.id);
+    await refundFreeTurn();
     throw err;
   }
   if (!opened) {
     await releaseTurn(workspaceId, member.id);
+    await refundFreeTurn();
     return new Response("not_found", { status: 404 });
   }
   const { ctx, history } = opened;
@@ -109,6 +182,13 @@ export async function POST(request: Request) {
           : "I couldn't reach my thoughts just then. Try me once more in a moment.";
         controller.enqueue(encoder.encode(msg));
         full += msg;
+
+        // Nothing at all came back — almost always configuration, a model the
+        // key can't reach. Not their fault and not worth one of their ten.
+        // A reply that died *mid-sentence* is not refunded: they got an
+        // answer, it is in the transcript, and the consultant read their
+        // question to produce it.
+        if (!started) await refundFreeTurn();
 
         const e = err as { status?: number; message?: string };
         console.error(
