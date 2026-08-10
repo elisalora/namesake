@@ -14,11 +14,24 @@
 // for us. On Vercel there is no .env and this quietly does nothing — the real
 // values come from the environment.
 import "dotenv/config";
+import { readFileSync } from "node:fs";
 
 const strict = Boolean(process.env.VERCEL) || process.env.NAMESAKE_STRICT_PREFLIGHT === "1";
 
+// Narrower than `strict`, for the one check below that is about what a
+// *customer* reads rather than about whether the app can function.
+//
+// A preview deploy has no customers. Blocking one would mean nobody could
+// click through a branch to look at the very copy in question, which is the
+// opposite of useful. Production is where somebody can be told two different
+// things, so production is where this refuses.
+const customerFacing =
+  process.env.VERCEL_ENV === "production" || process.env.NAMESAKE_STRICT_PREFLIGHT === "1";
+
 const fatal = [];
 const warn = [];
+/// Problems that only matter once real people are reading the pages.
+const customerFatal = [];
 
 const has = (name) => Boolean(process.env[name]?.trim());
 
@@ -74,6 +87,79 @@ if (!has("STRIPE_SECRET_KEY")) {
   );
 }
 
+/* ------------------------------------------------- the refund promise */
+
+// The one check here that isn't about a setting.
+//
+// The refund term is written out in prose on four surfaces — /refunds, the FAQ
+// answer, GiftForm and RefundNote — and nothing made them agree. That is not a
+// hypothetical failure: five live surfaces promised fourteen days against a
+// thirty-day policy for twelve days, and it was caught only because somebody
+// went looking. A customer reading two different numbers on the same site is
+// exactly this file's remit: broken in a way that looks fine from the outside.
+//
+// **This is the weaker of the two checks and it is here for one reason: it is
+// the one that runs.** `npm run probe` reads the *rendered* pages, which is
+// the truer question — a string that never reaches a screen is not a promise —
+// but it needs a running server, so it can never run inside a build. This one
+// reads source, catches the same disagreement, and sits in the only place that
+// can actually refuse a deploy.
+//
+// No network, no server, nothing external. It fails only when the repository
+// genuinely contradicts itself, and it names the file and the word when it
+// does.
+const REFUND_SURFACES = [
+  "src/app/refunds/page.tsx",
+  "src/app/faq/page.tsx",
+  "src/components/GiftForm.tsx",
+  "src/components/RefundNote.tsx",
+];
+// Every way a length of time has been written in this copy. Case-insensitive:
+// the FAQ answer opens the sentence, and the first version of the sibling
+// check in scripts/probe.ts silently skipped that whole surface for want of
+// this.
+const REFUND_TERMS = ["fourteen", "thirty", "14 days", "30 days"];
+
+const said = new Map(); // term -> [files]
+const missingFiles = [];
+for (const file of REFUND_SURFACES) {
+  let text;
+  try {
+    text = readFileSync(new URL(`../${file}`, import.meta.url), "utf8").toLowerCase();
+  } catch {
+    // Renamed or moved. Worth saying, but not worth refusing a build over —
+    // the list above is the thing that has gone stale, not the copy.
+    missingFiles.push(file);
+    continue;
+  }
+  for (const term of REFUND_TERMS) {
+    if (text.includes(term)) said.set(term, [...(said.get(term) ?? []), file]);
+  }
+}
+
+if (missingFiles.length) {
+  warn.push(
+    `The refund-term check couldn't find ${missingFiles.join(", ")}. If those moved, update ` +
+      `REFUND_SURFACES in scripts/preflight.mjs — until then they are unchecked.`,
+  );
+}
+
+if (said.size > 1) {
+  const detail = [...said]
+    .map(([term, files]) => `"${term}" in ${files.join(", ")}`)
+    .join("; and ");
+  customerFatal.push(
+    `The refund window is stated two different ways: ${detail}. Whichever is right, a ` +
+      `customer can currently read both — the page they're promised one thing on and the ` +
+      `button they're promised another under. Make them agree.`,
+  );
+} else if (said.size === 0) {
+  warn.push(
+    "No surface states a refund window at all. That promise was doing sales work under " +
+      "the pay buttons; check it hasn't been deleted rather than moved.",
+  );
+}
+
 /* ------------------------------------------------------------ the rest */
 
 if (!has("NAMESAKE_ADMIN_EMAILS")) {
@@ -92,21 +178,28 @@ if (!has("ANTHROPIC_API_KEY")) {
 
 /* ------------------------------------------------------------ report */
 
+// In production these are refusals like any other. Anywhere else they are the
+// loudest kind of warning, because the thing they describe is real either way
+// — it just hasn't reached anybody yet.
+if (customerFacing) fatal.push(...customerFatal);
+else for (const c of customerFatal) warn.push(`${c} (This will refuse a production build.)`);
+
 for (const w of warn) console.warn(`\n  ⚠  ${w}`);
 for (const f of fatal) console.error(`\n  ✖  ${f}`);
 
 if (fatal.length && strict) {
   console.error(
-    `\n  Refusing to build: ${fatal.length} setting(s) above would leave the deployed ` +
+    `\n  Refusing to build: ${fatal.length} problem(s) above would leave the deployed ` +
       `site broken in ways that look fine from the outside.\n` +
-      `  Set them in Vercel under Settings → Environment Variables, then redeploy.\n`,
+      `  Settings live in Vercel under Settings → Environment Variables; anything else ` +
+      `above is in the code.\n`,
   );
   process.exit(1);
 }
 
 if (fatal.length) {
   console.warn(
-    `\n  ${fatal.length} setting(s) above would break a real deploy. Continuing because ` +
+    `\n  ${fatal.length} problem(s) above would break a real deploy. Continuing because ` +
       `this is a local build.\n`,
   );
 } else if (!warn.length) {

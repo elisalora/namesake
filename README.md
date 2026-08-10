@@ -102,6 +102,24 @@ continues, it opens for both of you"*: the window has always been a fact about t
 
 **A comp from `/admin/codes` is not a trial.** It grants the whole product, deliberately.
 
+## The refund term is guarded in two places, and they are not the same guard
+
+It is written out in prose on four surfaces — `/refunds`, the FAQ answer, `GiftForm` and
+`RefundNote`. Nothing used to make them agree, and they didn't: five live surfaces promised
+fourteen days against a thirty-day policy for twelve days, caught only because somebody went
+looking.
+
+- **`npm run probe`** reads the *rendered pages*. That is the truer question — a string that
+  never reaches a screen is not a promise — but it needs a running server, so it can never
+  run inside a build.
+- **`scripts/preflight.mjs`** reads the *source*. Weaker, and it is the one that runs: it is
+  the first thing `npm run build` does, and on a **production** build a disagreement refuses
+  the build outright.
+
+Deliberately not fatal on a preview or locally, where it is a loud warning instead. A
+preview has no customers, and blocking one would stop anybody clicking through the branch to
+look at the very copy in question.
+
 ## Measuring the funnel
 
 Vercel Web Analytics, four events, named once in `src/lib/funnel.ts`:
