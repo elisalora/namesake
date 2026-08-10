@@ -18,10 +18,32 @@
 export const DUE_DATE_MAX_MONTHS_AHEAD = 12;
 export const DUE_DATE_MAX_MONTHS_BEHIND = 24;
 
-/// The one sentence anybody is shown when a due date is refused. Lives here
-/// beside the rule it describes, so a change to one is a change to both.
+/// A month count as somebody would say it out loud.
+function inWords(months: number) {
+  if (months % 12 === 0) {
+    const years = months / 12;
+    return years === 1 ? "a year" : `${years === 2 ? "two" : years} years`;
+  }
+  return months === 1 ? "a month" : `${months} months`;
+}
+
+/// The one sentence anybody is shown when a due date is refused.
+///
+/// Built from the two numbers above rather than restating them, because a
+/// sentence that quotes a bound is wrong the moment somebody changes the
+/// bound — and it is wrong in the worst way, confidently and in front of a
+/// customer.
+///
+/// The last clause is the useful one. A mistyped year is overwhelmingly what
+/// causes this, and naming the likely slip beats any amount of politeness.
+/// Note what it deliberately doesn't say: not "use a real date". The backward
+/// bound is wide precisely because people reconstruct a naming *after* the
+/// birth, so the person most likely to meet the lower edge is someone who
+/// typed their child's actual birthday — and this sentence can land on the
+/// first screen of opening a present.
 export const DUE_DATE_MESSAGE =
-  "That due date doesn't look right — use a real date, sometime around now.";
+  `That date is outside what we can take — anywhere from ${inWords(DUE_DATE_MAX_MONTHS_BEHIND)} ` +
+  `ago to ${inWords(DUE_DATE_MAX_MONTHS_AHEAD)} ahead. If it looks right to you, check the year.`;
 
 function shiftMonths(from: Date, months: number) {
   const d = new Date(from);

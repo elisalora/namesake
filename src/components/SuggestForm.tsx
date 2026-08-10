@@ -23,7 +23,10 @@ function messageFor(code: string | null): string {
     case "not_found":
       return "This suggestion link doesn't seem to exist any more. Worth checking it with whoever sent it.";
     case "full":
-      return "This journey has all the suggestions it can hold — the parents have plenty to be going on with. Tell them your name in person; it'll mean more anyway.";
+      // "Tell them the name", not "your name": this page has just asked the
+      // guest for their own name in one field and a suggested name in
+      // another, and "your name" reads as the first one.
+      return "This journey has all the suggestions it can hold — the parents have plenty to be going on with. Tell them the name in person; it'll mean more anyway.";
     case "too_many":
       return "A lot of names are arriving at once. Give it a minute and send yours again — nothing you've written is lost.";
     default:

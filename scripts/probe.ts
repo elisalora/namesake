@@ -17,7 +17,13 @@
 
 import "dotenv/config";
 
-import { parseDueDate, isDueDateOrBlank, DUE_DATE_MAX_MONTHS_AHEAD } from "../src/lib/dates";
+import {
+  parseDueDate,
+  isDueDateOrBlank,
+  DUE_DATE_MAX_MONTHS_AHEAD,
+  DUE_DATE_MAX_MONTHS_BEHIND,
+  DUE_DATE_MESSAGE,
+} from "../src/lib/dates";
 import { journeyDraft, createJourney } from "../src/lib/journey";
 import { resolveExpiry } from "../src/lib/purchase";
 import { getWorkspaceState } from "../src/lib/workspace";
@@ -74,6 +80,21 @@ function probeDueDate() {
 
   // A birth eighteen months ago is a real thing people enter here.
   check("a date well in the past is accepted", parseDueDate("2025-06-01", now) !== null);
+
+  // The refusal quotes both bounds, so it has to be built from them rather
+  // than restating them — a sentence that quotes a number is wrong the moment
+  // somebody changes the number, and wrong confidently, in front of a
+  // customer. This is the check that notices.
+  check(
+    "the refusal names the forward bound it actually enforces",
+    DUE_DATE_MESSAGE.includes(DUE_DATE_MAX_MONTHS_AHEAD === 12 ? "a year ahead" : `${DUE_DATE_MAX_MONTHS_AHEAD} months ahead`),
+    DUE_DATE_MESSAGE,
+  );
+  check(
+    "and the backward one",
+    DUE_DATE_MESSAGE.includes(DUE_DATE_MAX_MONTHS_BEHIND === 24 ? "two years ago" : `${DUE_DATE_MAX_MONTHS_BEHIND} months ago`),
+    DUE_DATE_MESSAGE,
+  );
 
   section("The draft schema is what actually stops it");
   const base = { you: { name: "Alex", email: "alex@example.com" }, partner: {} };
