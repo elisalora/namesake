@@ -38,6 +38,7 @@ export async function POST(request: Request) {
       },
     },
     origin: originFrom(request),
+    headers: request.headers,
   });
 
   if (!result.ok) return NextResponse.json({ error: result.reason }, { status: 400 });

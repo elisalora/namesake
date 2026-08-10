@@ -1,13 +1,17 @@
 import Link from "next/link";
 import StartForm from "@/components/StartForm";
 import DuckMark, { OrnamentRule } from "@/components/DuckMark";
+import TrackView from "@/components/TrackView";
 import { TIERS, formatPrice, describeWindow } from "@/lib/pricing";
+import { FUNNEL } from "@/lib/funnel";
 
 export default function Home() {
   const plan = TIERS.self_serve;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-10">
+      {/* Step one of the funnel. Everything below is measured against it. */}
+      <TrackView event={FUNNEL.landingView} />
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <DuckMark className="h-5 w-auto text-pewter-light" />

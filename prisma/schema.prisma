@@ -207,6 +207,11 @@ model Member {
   messages  ChatMessage[]
 
   @@unique([workspaceId, userId])
+  /// `Member_workspaceId_userId_key` starts with workspaceId, so a lookup by
+  /// userId alone can't use it — and that lookup is on the sign-in path
+  /// (`auth.ts`, the seat check) and on `/journeys`. Without this it is a
+  /// sequential scan of every seat in the product, for every signed-in user.
+  @@index([userId])
 }
 
 /// A candidate name on the shortlist.
@@ -292,6 +297,11 @@ model Comment {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name      NameEntry @relation(fields: [nameId], references: [id], onDelete: Cascade)
   member    Member?   @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  /// Loaded nested under every name on the six-second dashboard poll.
+  @@index([nameId])
+  /// Not read by name, but a workspace being deleted cascades through here.
+  @@index([workspaceId])
 }
 
 /// A name suggestion submitted by family/friends via the public link.
@@ -307,6 +317,9 @@ model Suggestion {
   createdAt     DateTime @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  /// Both columns of the poll's query: which journey, newest first.
+  @@index([workspaceId, createdAt])
 }
 
 /// The consultant conversation, per workspace (shared by both parents).
@@ -320,4 +333,9 @@ model ChatMessage {
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   member    Member?   @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  /// Read three ways, all of them starting with the journey: the poll's
+  /// newest 200, the consultant's newest 40, and the per-journey message
+  /// count that enforces `NAMESAKE_MSG_CAP` on every single turn.
+  @@index([workspaceId, createdAt])
 }

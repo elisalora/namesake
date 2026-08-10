@@ -16,11 +16,33 @@ export async function getWorkspaceState(workspaceId: string) {
           comments: { orderBy: { createdAt: "asc" }, include: { member: true } },
         },
       },
-      suggestions: { orderBy: { createdAt: "desc" } },
-      messages: { orderBy: { createdAt: "asc" }, take: 200, include: { member: true } },
+      // Bounded, like everything else on this query. This is the payload of a
+      // poll that runs every six seconds in two browsers, and the endpoint
+      // that fills this list is the one public write path in the product —
+      // anyone who photographs a shower card can add to it. `POST
+      // /api/suggest/[slug]` now refuses past 500 per journey, so 200 here is
+      // a display bound rather than the thing holding the door: it is the
+      // newest 200, and a journey that ever reaches it is drowning in
+      // suggestions rather than losing any.
+      suggestions: { orderBy: { createdAt: "desc" }, take: 200 },
+      // The *newest* 200, not the oldest.
+      //
+      // This was `orderBy: asc` with the same `take`, which is the same
+      // mistake `api/chat/route.ts` documents fixing in its own copy of this
+      // query — and it was still here. Past 200 messages the dashboard froze
+      // on the opening small-talk: every new reply landed in the database,
+      // the panel kept rendering the first 200, and the consultant looked
+      // like it had stopped answering. `NAMESAKE_MSG_CAP` allows 120 user
+      // turns, so a couple who really uses this reaches 240 messages and
+      // meets it.
+      messages: { orderBy: { createdAt: "desc" }, take: 200, include: { member: true } },
     },
   });
   if (!ws) return null;
+
+  // Back into the order they were said in — the query above fetched them
+  // newest first to get the right end of a long conversation.
+  const messages = [...ws.messages].reverse();
 
   const firsts = ws.names.filter((n) => n.role !== "middle");
   const middles = ws.names.filter((n) => n.role === "middle");
@@ -175,7 +197,7 @@ export async function getWorkspaceState(workspaceId: string) {
       status: s.status,
       createdAt: s.createdAt.toISOString(),
     })),
-    messages: ws.messages.map((m) => ({
+    messages: messages.map((m) => ({
       id: m.id,
       role: m.role,
       content: m.content,

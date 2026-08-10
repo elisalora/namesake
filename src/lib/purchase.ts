@@ -18,6 +18,9 @@ import {
 } from "@/lib/pricing";
 import { getStripe } from "@/lib/stripe";
 import { sendJourneyReadyLink, sendGiftLink, sendBoxOnItsWay, sendKeepsakeOrdered } from "@/lib/email";
+import { trackFunnel } from "@/lib/analytics";
+import { FUNNEL } from "@/lib/funnel";
+import { parseDueDate } from "@/lib/dates";
 
 // Namesake — the money path.
 //
@@ -58,7 +61,14 @@ export function resolveExpiry(
 ) {
   if (purchase.expiryRule === "due_date_grace") {
     if (dueDate && dueDate.getTime() > from.getTime()) {
-      return addDays(dueDate, purchase.graceDays ?? 7);
+      const end = addDays(dueDate, purchase.graceDays ?? 7);
+      // Check the result, not just the input. The old guard here asked only
+      // whether the date parsed — so `+275760-09-12`, the largest Date
+      // JavaScript has, sailed through it and then overflowed on `+7 days`,
+      // making `Invalid Date` the end of somebody's paid window. Bounding the
+      // input in lib/dates.ts is what actually prevents this; this is the
+      // line that stops a future change to those bounds from being silent.
+      if (!Number.isNaN(end.getTime())) return end;
     }
     return addMonths(from, purchase.fallbackMonths ?? 9);
   }
@@ -354,6 +364,10 @@ export async function fulfillPurchase(args: {
   stripeSessionId?: string | null;
   shipping?: { name?: string | null; address?: unknown } | null;
   origin: string;
+  /// The incoming request's headers, for the one analytics event that means
+  /// revenue. Required rather than optional so a third caller can't quietly
+  /// arrive without it and leave the last step of the funnel reading zero.
+  headers: Headers;
 }): Promise<FulfillResult> {
   const outcome = await db.$transaction(async (tx) => {
     const purchase = await tx.purchase.findUnique({ where: { id: args.purchaseId } });
@@ -416,10 +430,32 @@ export async function fulfillPurchase(args: {
 
   if (outcome.state === "missing") return { ok: false, reason: "missing" };
   if (outcome.state === "no-workspace") return { ok: false, reason: "no-workspace" };
+  // Deliberately silent. `already` is a Stripe retry of a webhook we've
+  // handled, and Stripe retries a lot — counting it would inflate the only
+  // number in the funnel that means money, in proportion to how flaky the
+  // network was rather than to how much was sold. The transaction above is
+  // what makes this the state *transition* rather than a state.
   if (outcome.state === "already") return { ok: true, state: "already" };
+
+  // The one event that means revenue. It fires for a first-time fulfillment
+  // and nothing else — both here and in the `granted` case below.
+  const sold = (state: "granted" | "extended") =>
+    trackFunnel(
+      FUNNEL.purchaseFulfilled,
+      {
+        state,
+        tier: outcome.purchase.tier,
+        kind: outcome.purchase.kind,
+        amountCents: outcome.purchase.amountCents,
+      },
+      args.headers,
+    );
+
   if (outcome.state === "extended") {
+    await sold("extended");
     return { ok: true, state: "extended", purchaseId: outcome.purchase.id };
   }
+  await sold("granted");
 
   // Paid and waiting to be claimed — send whoever it's for their link.
   const purchase = outcome.purchase;
@@ -516,12 +552,7 @@ export async function redeemPurchase(
   const parsed = journeyDraft.safeParse(source);
   if (!parsed.success) return { ok: false, reason: "malformed" };
 
-  const dueDate = parsed.data.dueDate ? new Date(parsed.data.dueDate) : null;
-  const expiresAt = resolveExpiry(
-    purchase,
-    new Date(),
-    dueDate && !Number.isNaN(dueDate.getTime()) ? dueDate : null,
-  );
+  const expiresAt = resolveExpiry(purchase, new Date(), parseDueDate(parsed.data.dueDate));
 
   try {
     return await db.$transaction(async (tx) => {

@@ -30,6 +30,48 @@ simulate a payment. Only the database is genuinely required.
 
 To deploy it, see **[DEPLOY.md](./DEPLOY.md)**.
 
+## Checking it still works
+
+```bash
+DATABASE_URL=postgres://…/namesake_probe npm run probe
+```
+
+One file, `scripts/probe.ts`, no framework. It covers the parts where being wrong costs
+money or a customer: due dates and the paid window they decide, the bounds on the polled
+dashboard read, the indexes underneath it, and the limits on the public suggestion
+endpoint. It prints one line per check and exits non-zero on the first failure.
+
+Point it at a **scratch database** — it writes rows and deliberately doesn't clean up,
+because a failing check is much easier to understand when the rows that caused it are
+still there. Four of its checks drive real HTTP; they're skipped unless a server is
+running and you tell it where:
+
+```bash
+npm run dev                                    # in another terminal
+DATABASE_URL=… PROBE_ORIGIN=http://localhost:3000 npm run probe
+```
+
+## Measuring the funnel
+
+Vercel Web Analytics, four events, named once in `src/lib/funnel.ts`:
+
+| Event | Where it fires |
+|---|---|
+| `landing_view` | the storefront, on first paint |
+| `start_submit` | the start form, once it has passed validation |
+| `checkout_created` | `/api/checkout`, once there is somewhere to pay |
+| `purchase_fulfilled` | `fulfillPurchase`, on a first-time grant only |
+
+Only the last one means revenue. It is deliberately silent on a repeat webhook, so a
+Stripe retry can't inflate it.
+
+**All four are no-ops off Vercel** — the browser half loads no script, and the server
+half prints the event to the console instead of sending it. That is how you check a call
+site locally: `npm run dev`, do the thing, and look for `[Vercel Web Analytics] Track`.
+
+No identifier, no email, no workspace id ever travels with an event. See the note at the
+top of `src/lib/analytics.ts`.
+
 ## Turn the consultant fully on
 
 Add your Anthropic API key to `.env`:

@@ -22,6 +22,10 @@ function messageFor(code: string | null): string {
       return "This journey isn't taking suggestions at the moment.";
     case "not_found":
       return "This suggestion link doesn't seem to exist any more. Worth checking it with whoever sent it.";
+    case "full":
+      return "This journey has all the suggestions it can hold — the parents have plenty to be going on with. Tell them your name in person; it'll mean more anyway.";
+    case "too_many":
+      return "A lot of names are arriving at once. Give it a minute and send yours again — nothing you've written is lost.";
     default:
       return "Sorry — that didn't go through. Try again in a moment.";
   }

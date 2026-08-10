@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { DEFAULT_PARTNER_NAME } from "@/lib/seat";
 import { MAX_BABIES } from "@/lib/babies";
+import { DUE_DATE_MESSAGE, isDueDateOrBlank, parseDueDate } from "@/lib/dates";
 
 const slugId = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 10);
 
@@ -36,7 +37,17 @@ export const journeyDraft = z.object({
   /// which is different from never having been asked. "mixed" is one of each,
   /// which only exists once there's more than one baby.
   expecting: z.enum(["girl", "boy", "mixed", "surprise"]).optional(),
-  dueDate: z.string().optional(),
+  /// The only field in this draft a *gift recipient* fills in, and the only
+  /// one that decides anything but text: for the `due_date_grace` tiers it is
+  /// what `resolveExpiry` turns into the end of the paid window. Unchecked, it
+  /// did two things — `"2999-01-01"` bought a nine-century window on a $50
+  /// gift, and `"banana"` reached `new Date()` below and made opening a
+  /// present a 500. One rule, in lib/dates.ts, shared with the PATCH route
+  /// that edits the same field later.
+  dueDate: z
+    .string()
+    .refine((v) => isDueDateOrBlank(v), DUE_DATE_MESSAGE)
+    .optional(),
   you: z.object({
     name: z.string().trim().min(1, "We'll need your first name.").max(60, "That first name is a little long — 60 characters or fewer."),
     // The browser's type=email widget accepts a domain with no dot, so
@@ -86,7 +97,11 @@ export async function createJourney(
       // "One of each" is only meaningful with more than one baby; if the count
       // came back to one, the answer it belonged to is gone with it.
       expecting: draft.expecting === "mixed" && (draft.babyCount ?? 1) < 2 ? null : draft.expecting ?? null,
-      dueDate: draft.dueDate ? new Date(draft.dueDate) : null,
+      // Never a bare `new Date(...)`. The schema above already refuses
+      // anything this would choke on, but the value also reaches here from
+      // `redeemPurchase`, which re-parses a draft stored months earlier — so
+      // the guard lives at the write rather than only at the door.
+      dueDate: parseDueDate(draft.dueDate),
       expiresAt: opts.expiresAt ?? null,
       suggestSlug: opts.suggestSlug || slugId(),
       members: {
