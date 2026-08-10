@@ -242,7 +242,18 @@ export default function GiftForm({
           <p className="mt-2 text-center text-xs leading-relaxed text-ink-soft">
             Paid once — no subscription for them to cancel.
             {tier.physical ? " We'll ask where to post it at checkout." : ""} Fully{" "}
-            <a href="/refunds" className="underline underline-offset-2 hover:text-sage-deep">
+            {/* A new tab, not a navigation. This form is half-filled by the
+                time anybody reads the small print — a tier chosen, a name
+                typed, sometimes an address — and sending them to a policy
+                page to reassure themselves would cost them all of it. Read
+                the terms, close the tab, still standing where you were. The
+                same reasoning is on `RefundNote` at the wall. */}
+            <a
+              href="/refunds"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-sage-deep"
+            >
               refundable
             </a>{" "}
             for thirty days.
