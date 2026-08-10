@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { track } from "@vercel/analytics";
 import ExpectingChoice, { type Expecting } from "./ExpectingChoice";
 import MultiplesChoice from "./MultiplesChoice";
+import { FUNNEL } from "@/lib/funnel";
 
 export default function StartForm({ priceLabel }: { priceLabel: string }) {
   const [loading, setLoading] = useState(false);
@@ -34,6 +36,11 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
       return;
     }
     setLoading(true);
+    // Step two, counted here rather than on the button's click: a submit that
+    // never got past the two checks above isn't an attempt to buy, it's a
+    // half-filled form. Counting those would make the drop-off to step three
+    // look like a payment problem when it was a typo.
+    track(FUNNEL.startSubmit, { tier: "self_serve", babyCount });
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",

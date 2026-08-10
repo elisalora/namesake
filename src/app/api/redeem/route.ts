@@ -40,7 +40,18 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Please check the details and try again." }, { status: 400 });
+    // Say which field, when we can. Every message inside `journeyDraft` was
+    // written to be read by a customer — `/api/checkout` has always handed
+    // them straight back — but this route swallowed all of them behind one
+    // sentence. That is the wrong place to be vague: the person reading it is
+    // holding a present they cannot open, and "check the details" doesn't tell
+    // them which detail. Restricted to the `details` object, because a
+    // malformed `code` fails with Zod's own developer-facing wording.
+    const issue = parsed.error.issues.find((i) => i.path[0] === "details");
+    return NextResponse.json(
+      { error: issue?.message ?? "Please check the details and try again." },
+      { status: 400 },
+    );
   }
 
   const user = await getCurrentUser();

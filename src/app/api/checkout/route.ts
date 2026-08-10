@@ -6,6 +6,8 @@ import { journeyDraft } from "@/lib/journey";
 import { getMemberForWorkspace } from "@/lib/session";
 import { createPurchase, createExtension, startCheckout } from "@/lib/purchase";
 import { TIERS, isTierId, isAddOnId } from "@/lib/pricing";
+import { trackFunnel } from "@/lib/analytics";
+import { FUNNEL } from "@/lib/funnel";
 
 const addOns = z
   .array(z.string().refine(isAddOnId, "Unknown add-on."))
@@ -138,6 +140,23 @@ export async function POST(request: Request) {
 
   const checkout = await startCheckout(purchase.id, origin);
   if (!checkout.ok) return NextResponse.json({ error: checkout.error }, { status: 502 });
+
+  // Step three. Counted only once there is somewhere to pay — a purchase row
+  // with no checkout session behind it is a failure, and counting it here
+  // would hide exactly the outage it looks like a conversion problem.
+  await trackFunnel(
+    FUNNEL.checkoutCreated,
+    {
+      tier: purchase.tier,
+      kind: purchase.kind,
+      amountCents: purchase.amountCents,
+      // `true` means the local simulate-payment page, which is never
+      // production. Worth carrying so a dashboard full of them is legible
+      // rather than mystifying.
+      simulated: checkout.simulated,
+    },
+    request.headers,
+  );
 
   return NextResponse.json({
     purchaseId: purchase.id,

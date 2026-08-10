@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getWorkspaceState } from "@/lib/workspace";
 import { getMemberForWorkspace, getWritableMember, writeDenied } from "@/lib/session";
 import { MAX_BABIES } from "@/lib/babies";
+import { DUE_DATE_MESSAGE, parseDueDate } from "@/lib/dates";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -45,9 +46,13 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
     if (dueDate === "") {
       due = null;
     } else {
-      const d = new Date(dueDate);
-      if (Number.isNaN(d.getTime())) {
-        return NextResponse.json({ error: "That date didn't look right." }, { status: 400 });
+      // The same rule the start form and gift redemption use — this route
+      // used to check only that the string parsed, which let a date centuries
+      // out be stored here even though it correctly refuses to move
+      // `expiresAt`. One question, one answer, in lib/dates.ts.
+      const d = parseDueDate(dueDate);
+      if (!d) {
+        return NextResponse.json({ error: DUE_DATE_MESSAGE }, { status: 400 });
       }
       due = d;
     }

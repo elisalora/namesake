@@ -68,6 +68,7 @@ export async function POST(request: Request) {
       ? { name: shippingDetails.name ?? null, address: shippingDetails.address }
       : null,
     origin: originFrom(request),
+    headers: request.headers,
   });
 
   if (!result.ok) {

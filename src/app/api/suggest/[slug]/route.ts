@@ -11,6 +11,18 @@ const schema = z.object({
   email: z.string().trim().email().optional().or(z.literal("")),
 });
 
+/// Nobody signs in to reach this, so the limits are the only thing standing
+/// between a photographed shower card and a dashboard that won't load.
+///
+/// All three are per *workspace* rather than per IP on purpose. A serverless
+/// deployment has no shared memory to count IPs in, and the alternative —
+/// another table, written to on every request — costs more than the thing it
+/// protects. Per-workspace is the blast radius that actually matters: whatever
+/// one guest does, they can only spoil the one journey whose link they hold.
+const MAX_PER_WORKSPACE = 500;
+const BURST_WINDOW_MS = 60_000;
+const MAX_PER_BURST_WINDOW = 10;
+
 // Public endpoint — family & friends submit via the shareable link. No auth.
 //
 // The error codes are narrower than they look like they need to be, and that's
@@ -48,6 +60,39 @@ export async function POST(request: Request, ctx: { params: Promise<{ slug: stri
   // either — the public link is a write path like any other.
   if (hasExpired(ws)) {
     return NextResponse.json({ error: "expired" }, { status: 409 });
+  }
+
+  const [total, recent, duplicate] = await Promise.all([
+    db.suggestion.count({ where: { workspaceId: ws.id } }),
+    db.suggestion.count({
+      where: { workspaceId: ws.id, createdAt: { gt: new Date(Date.now() - BURST_WINDOW_MS) } },
+    }),
+    // Case-insensitively the same name from the same person. Grandma pressing
+    // send twice is by far the likeliest cause, and she should be thanked
+    // rather than told off — so this isn't an error, it's a no-op that looks
+    // exactly like success. It also happens to blunt the cheapest kind of
+    // flood, which is the same row over and over.
+    db.suggestion.findFirst({
+      where: {
+        workspaceId: ws.id,
+        suggestedName: { equals: parsed.data.suggestedName, mode: "insensitive" },
+        suggesterName: { equals: parsed.data.suggesterName, mode: "insensitive" },
+      },
+      select: { id: true },
+    }),
+  ]);
+
+  if (duplicate) return NextResponse.json({ ok: true, duplicate: true });
+
+  // Permanent, so a 409 — the form disables its button on one of these, which
+  // is right here: nothing about waiting will make room.
+  if (total >= MAX_PER_WORKSPACE) {
+    return NextResponse.json({ error: "full" }, { status: 409 });
+  }
+  // Temporary, so a 429 and *not* a 409. Told it was full, a real guest at a
+  // busy shower would give up on a link that would have worked a minute later.
+  if (recent >= MAX_PER_BURST_WINDOW) {
+    return NextResponse.json({ error: "too_many" }, { status: 429 });
   }
 
   await db.suggestion.create({
