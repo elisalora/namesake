@@ -114,49 +114,99 @@ const REFUND_SURFACES = [
   "src/components/GiftForm.tsx",
   "src/components/RefundNote.tsx",
 ];
-// Every way a length of time has been written in this copy. Case-insensitive:
-// the FAQ answer opens the sentence, and the first version of the sibling
-// check in scripts/probe.ts silently skipped that whole surface for want of
-// this.
-const REFUND_TERMS = ["fourteen", "thirty", "14 days", "30 days"];
 
-const said = new Map(); // term -> [files]
+// Spellings mapped to the window they mean, rather than a list of words
+// compared to each other.
+//
+// "thirty" and "30 days" are one promise written two ways. Comparing the words
+// would refuse a production build for a numeral — naming two files and saying
+// they disagree when they say the same thing, to whoever is mid-deploy. The
+// check would be asserting typographic uniformity and reporting it as a
+// contradiction.
+const REFUND_TERMS = {
+  fourteen: 14,
+  "14 days": 14,
+  thirty: 30,
+  "30 days": 30,
+  sixty: 60,
+  "60 days": 60,
+};
+
+// Case-insensitive, and that is not fussiness. The sibling check in
+// scripts/probe.ts was case-sensitive in its first draft and silently skipped
+// the FAQ entirely, because that answer opens the sentence — "Fourteen days
+// from purchase". A check that quietly covers one fewer surface than it claims
+// to is worse than no check.
+const stated = new Map(); // file -> Set of windows it names
 const missingFiles = [];
 for (const file of REFUND_SURFACES) {
   let text;
   try {
-    text = readFileSync(new URL(`../${file}`, import.meta.url), "utf8").toLowerCase();
+    text = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
   } catch {
-    // Renamed or moved. Worth saying, but not worth refusing a build over —
-    // the list above is the thing that has gone stale, not the copy.
     missingFiles.push(file);
     continue;
   }
-  for (const term of REFUND_TERMS) {
-    if (text.includes(term)) said.set(term, [...(said.get(term) ?? []), file]);
+  // Comments are not copy, and reading them as copy is a false positive
+  // waiting to happen. `RefundNote.tsx` explains itself in a doc comment that
+  // says "promised thirty days" — so a version of this that scanned the whole
+  // file would have found a window on that surface even after the visible
+  // sentence stopped stating one, and would refuse a production build the day
+  // somebody wrote "we used to say fourteen" above a line saying thirty.
+  //
+  // Block comments and whole-line `//` or `*` comments only. Deliberately not
+  // clever: it must never eat the inside of a string, and `https://` on a code
+  // line is exactly what a greedier version would swallow.
+  text = text
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .split("\n")
+    .filter((line) => !/^\s*(\/\/|\*)/.test(line))
+    .join("\n")
+    .toLowerCase();
+  const windows = new Set();
+  for (const [term, days] of Object.entries(REFUND_TERMS)) {
+    if (text.includes(term)) windows.add(days);
   }
+  stated.set(file, windows);
 }
 
 if (missingFiles.length) {
-  warn.push(
-    `The refund-term check couldn't find ${missingFiles.join(", ")}. If those moved, update ` +
-      `REFUND_SURFACES in scripts/preflight.mjs — until then they are unchecked.`,
+  customerFatal.push(
+    `The refund-term check can't find ${missingFiles.join(", ")}. Those surfaces are ` +
+      `unchecked until REFUND_SURFACES in scripts/preflight.mjs is updated — so this check ` +
+      `is currently asserting less than it claims to.`,
   );
 }
 
-if (said.size > 1) {
-  const detail = [...said]
-    .map(([term, files]) => `"${term}" in ${files.join(", ")}`)
-    .join("; and ");
+// Two failures, and the second is the one that would otherwise pass.
+//
+// A surface naming *no* recognised window is not silence, it is a blind spot:
+// either the policy moved to a number this list doesn't know, or that surface
+// stopped making the promise. Both mean the guard has stopped guarding it —
+// and a partial edit is exactly how the fourteen-day version happened. Asking
+// only whether the windows found agree would let three files quietly say
+// something unrecognised while the fourth kept the old number and the check
+// stayed green.
+const silent = [...stated].filter(([, windows]) => windows.size === 0).map(([file]) => file);
+if (silent.length) {
   customerFatal.push(
-    `The refund window is stated two different ways: ${detail}. Whichever is right, a ` +
-      `customer can currently read both — the page they're promised one thing on and the ` +
-      `button they're promised another under. Make them agree.`,
+    `No recognised refund window on ${silent.join(", ")}. Either the policy changed to a ` +
+      `number REFUND_TERMS doesn't know — add it — or those surfaces stopped stating one. ` +
+      `Until that's resolved this check is not covering them.`,
   );
-} else if (said.size === 0) {
-  warn.push(
-    "No surface states a refund window at all. That promise was doing sales work under " +
-      "the pay buttons; check it hasn't been deleted rather than moved.",
+}
+
+const windows = new Set([...stated.values()].flatMap((w) => [...w]));
+if (windows.size > 1) {
+  const detail = [...stated]
+    .filter(([, w]) => w.size)
+    .map(([file, w]) => `${file} says ${[...w].join(" and ")}`)
+    .join("; ");
+  customerFatal.push(
+    `The refund window is stated as ${[...windows].sort((a, b) => a - b).join(" and ")} days ` +
+      `in different places: ${detail}. Whichever is right, a customer can currently read ` +
+      `both — the page they're promised one thing on and the button they're promised ` +
+      `another under. Make them agree.`,
   );
 }
 
