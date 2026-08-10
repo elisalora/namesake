@@ -3,10 +3,27 @@ import GiftForm from "@/components/GiftForm";
 import DuckMark, { OrnamentRule } from "@/components/DuckMark";
 import { GIFT_TIERS, ADD_ONS, formatPrice, describeWindow } from "@/lib/pricing";
 
+const DESCRIPTION =
+  "A gift for expecting parents: the way to choose their child's name. A private room for the two of them, a card the whole shower can scan, and the story of the name at the end.";
+
+// `openGraph` is replaced wholesale rather than merged with the root's, so a
+// page that sets only `title` would still share the site-wide card text. Both
+// blocks are restated here on purpose.
 export const metadata = {
   title: "Give a Namesake journey",
-  description:
-    "A gift for expecting parents: the way to choose their child's name. A private room for the two of them, a card the whole shower can scan, and the story of the name at the end.",
+  description: DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: "Namesake",
+    title: "Give a Namesake journey",
+    description: DESCRIPTION,
+    locale: "en_GB",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Give a Namesake journey",
+    description: DESCRIPTION,
+  },
 };
 
 // The gifter's storefront. A different person from the one who uses it, so
