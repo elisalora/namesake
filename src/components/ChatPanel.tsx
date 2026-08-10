@@ -6,6 +6,7 @@ import { openingMessage, CONVERSATION_STARTERS, MULTIPLES_STARTERS } from "@/lib
 import { namedParents } from "@/lib/seat";
 import { babiesLabel, slots } from "@/lib/babies";
 import { NUDGE_AT_REMAINING } from "@/lib/trial";
+import RefundNote from "./RefundNote";
 
 type Me = { id: string; name: string; color: string };
 
@@ -497,6 +498,9 @@ export default function ChatPanel({
           <div className="mt-3">
             <UpgradeButton workspaceId={ws.id} label={`Continue · ${upgradePrice}`} />
           </div>
+          {/* Under the button that charges, and nowhere else — see the note on
+              the component. Deliberately not repeated under the nudge above. */}
+          <RefundNote />
         </div>
       )}
 

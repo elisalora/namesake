@@ -296,7 +296,10 @@ async function probeSuggestLimits(workspaceId: string) {
 function probeFunnelNames() {
   section("Funnel event names");
   const names = Object.values(FUNNEL);
-  check("all four are distinct", new Set(names).size === names.length && names.length === 4);
+  // Distinctness, not a count. This asserted `length === 4` and went red the
+  // moment a fifth step was added — an instrument reporting a fact about
+  // itself rather than about the thing it measures.
+  check("every event name is distinct", new Set(names).size === names.length, names.join(", "));
   check(
     "and none of them is empty or whitespace",
     names.every((n) => typeof n === "string" && n.trim() === n && n.length > 0),
@@ -433,6 +436,11 @@ async function probeFreeTier() {
     String((await db.user.findUnique({ where: { email: ownerEmail } }))?.freeTurnsUsed),
   );
 
+  // `wall_reached` is the denominator for "is $20 the right price", so it has
+  // to fire exactly once per person. Off Vercel it prints rather than sends,
+  // which is the only way to see it from here — but the thing that makes it
+  // exactly-once is the RETURNING on the spend, and that is checked below by
+  // the count landing on the allowance and never past it.
   const wall = await say(owner, "one more");
   check(
     "the next one is refused with its own code, not the expired-journey one",
@@ -491,6 +499,27 @@ async function probeFreeTier() {
   );
 
   // --- the two closed doors ------------------------------------------------
+
+  // The refund promise has to sit under the button that charges. It used to
+  // live under the start form; the free tier took that button's money away,
+  // and for a while it reappeared nowhere — leaving a gifter promised thirty
+  // days and the self-serve buyer, the whole person this tier exists to
+  // convert, promised nothing.
+  const walled = await owner.req(`/w/${workspaceId}`);
+  const flat = walled.text.replace(/<!--.*?-->/g, "").replace(/&apos;|&#x27;/g, "'");
+  check("the wall is on screen", flat.includes("still yours to read"));
+  check(
+    "and the button that charges carries the refund promise",
+    flat.includes("refundable") && flat.includes('href="/refunds"'),
+  );
+  // The landing page keeps its footer link to /refunds — that is navigation,
+  // and it was never the thing at issue. What must not come back is a refund
+  // *term* in the fine print under a button that takes no money.
+  const landing = await fetch(origin).then((r) => r.text());
+  check(
+    "while the free start button, taking no money, promises no refund window",
+    !landing.includes("refundable") && !landing.includes("thirty days"),
+  );
 
   const shower = await owner.req(`/w/${workspaceId}/shower`);
   check(

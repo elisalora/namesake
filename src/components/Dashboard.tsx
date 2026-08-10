@@ -11,6 +11,7 @@ import ChatPanel from "./ChatPanel";
 import ShortlistPanel from "./ShortlistPanel";
 import SignOutButton from "./SignOutButton";
 import KeepsakeUpsell from "./KeepsakeUpsell";
+import RefundNote from "./RefundNote";
 
 type Me = { id: string; name: string; color: string };
 
@@ -312,6 +313,7 @@ function DecidedBanner({
               <div className="mt-3">
                 <UpgradeInline workspaceId={ws.id} label={`Continue · ${upgradePrice}`} />
               </div>
+              <RefundNote />
             </div>
           ) : (
             <>
@@ -454,17 +456,43 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
   );
 }
 
-function CopyRow({ label, url }: { label: string; url: string }) {
+function CopyRow({
+  label,
+  url,
+  /// Show the whole thing rather than the first few characters.
+  ///
+  /// The single-line field is right for a link — you recognise a URL from its
+  /// start, and truncation costs nothing. It is wrong for a sentence: a
+  /// hundred and fifty characters in a modal-width input renders as a clause
+  /// cut off mid-thought, and the part that gets hidden is the end, which for
+  /// the gift line is the URL — the one element that makes it a shareable
+  /// line rather than a stray remark. The clipboard was always getting the
+  /// whole thing; it just looked broken.
+  multiline = false,
+}: {
+  label: string;
+  url: string;
+  multiline?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   return (
     <div>
       <div className="mb-1 text-sm font-semibold text-ink">{label}</div>
       <div className="flex gap-2">
-        <input
-          readOnly
-          value={url}
-          className="flex-1 truncate rounded-xl border border-line bg-paper px-3 py-2 text-xs text-ink-soft"
-        />
+        {multiline ? (
+          <textarea
+            readOnly
+            rows={3}
+            value={url}
+            className="flex-1 resize-none rounded-xl border border-line bg-paper px-3 py-2 text-xs leading-relaxed text-ink-soft"
+          />
+        ) : (
+          <input
+            readOnly
+            value={url}
+            className="flex-1 truncate rounded-xl border border-line bg-paper px-3 py-2 text-xs text-ink-soft"
+          />
+        )}
         <button
           onClick={() => {
             navigator.clipboard.writeText(url);
@@ -534,6 +562,7 @@ function GiftLineRow({ origin }: { origin: string }) {
   const host = origin.replace(/^https?:\/\//, "");
   return (
     <CopyRow
+      multiline
       label="Let someone gift the rest (optional)"
       url={`We started choosing a name for the baby — this is where we're doing it, if you ever wanted to give something odd and lovely. ${host}/gift`}
     />

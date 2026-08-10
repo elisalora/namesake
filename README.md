@@ -110,11 +110,19 @@ Vercel Web Analytics, four events, named once in `src/lib/funnel.ts`:
 |---|---|
 | `landing_view` | the storefront, on first paint |
 | `start_submit` | the start form, once it has passed validation |
-| `checkout_created` | `/api/checkout`, once there is somewhere to pay |
+| `checkout_created` | `/api/checkout` (and `/api/start`), once there is somewhere to go |
+| `wall_reached` | the turn that spends somebody's **last** free conversation |
 | `purchase_fulfilled` | `fulfillPurchase`, on a first-time grant only |
 
 Only the last one means revenue. It is deliberately silent on a repeat webhook, so a
 Stripe retry can't inflate it.
+
+**The ratio worth watching is `purchase_fulfilled / wall_reached`.** Without the wall step,
+a low purchase count is ambiguous between *nobody engaged* and *everybody engaged and
+refused to pay* — and those have opposite fixes. `wall_reached` fires on the turn that takes
+the count to its limit, not on the refusal afterwards and not on the wall rendering, because
+both of those repeat and this has to be a denominator. The `RETURNING` on the spend is what
+makes it exactly once even for two concurrent turns.
 
 **All four are no-ops off Vercel** — the browser half loads no script, and the server
 half prints the event to the console instead of sending it. That is how you check a call

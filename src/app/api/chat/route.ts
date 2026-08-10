@@ -7,6 +7,8 @@ import { claimTurn, releaseTurn, turnHolder } from "@/lib/turn";
 import { namedParents } from "@/lib/seat";
 import { babiesLabel, slotLabel, slots } from "@/lib/babies";
 import { FREE_TURNS } from "@/lib/trial";
+import { trackFunnel } from "@/lib/analytics";
+import { FUNNEL } from "@/lib/funnel";
 
 const schema = z.object({
   workspaceId: z.string(),
@@ -75,11 +77,21 @@ export async function POST(request: Request) {
     // tenth. The same shape the codebase already uses to spend a login token
     // and to spend a purchase — one statement, and the database decides who
     // won.
-    const spent = await db.user.updateMany({
-      where: { id: userId, freeTurnsUsed: { lt: FREE_TURNS } },
-      data: { freeTurnsUsed: { increment: 1 } },
-    });
-    if (spent.count === 0) {
+    //
+    // Raw, rather than `updateMany`, only for the RETURNING. `wall_reached`
+    // has to fire exactly once per person or it is useless as a denominator,
+    // and updating and then reading back would let two concurrent turns both
+    // see the limit and both report it. RETURNING hands each statement the
+    // value *it* produced, so precisely one of them comes back holding the
+    // last turn.
+    const spent = await db.$queryRaw<{ freeTurnsUsed: number }[]>`
+      update "User"
+         set "freeTurnsUsed" = "freeTurnsUsed" + 1
+       where "id" = ${userId}
+         and "freeTurnsUsed" < ${FREE_TURNS}
+      returning "freeTurnsUsed"
+    `;
+    if (spent.length === 0) {
       // Its own code, not the 402 an expired journey gets. The two are
       // different sentences on screen and — more to the point — different
       // states: this journey is not over, this *person* is out of turns, and
@@ -90,6 +102,19 @@ export async function POST(request: Request) {
       });
     }
     spentFreeTurn = true;
+
+    // That was their last one. The moment worth counting: everyone who gets
+    // here has used the product properly and is now looking at a price, so
+    // this is the denominator for whether $20 is the right number. Fired here
+    // rather than when the wall renders or when the next turn is refused,
+    // because both of those repeat every time the person comes back.
+    //
+    // Not awaited into the request's critical path — a couple of hundred
+    // milliseconds of analytics has no business sitting between somebody and
+    // their consultant. It logs its own failures.
+    if (spent[0].freeTurnsUsed >= FREE_TURNS) {
+      void trackFunnel(FUNNEL.wallReached, { turns: FREE_TURNS }, request.headers);
+    }
   }
 
   // Take the conversation before reading it, not after.
