@@ -14,7 +14,18 @@ export default function RefundNote() {
   return (
     <p className="mt-2 text-xs leading-relaxed text-ink-soft">
       Paid once, nothing to cancel — and{" "}
-      <a href="/refunds" className="underline underline-offset-2 hover:text-sage-deep">
+      {/* A new tab, unlike the same link on the pages this copy came from.
+          Those live somewhere leaving costs nothing. This one sits at the
+          wall, where somebody has a conversation and a shortlist behind them
+          and a decision in front of them — taking the whole tab to a policy
+          page and leaving them to find their way back turns a reassurance
+          into an exit. */}
+      <a
+        href="/refunds"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-2 hover:text-sage-deep"
+      >
         refundable
       </a>{" "}
       for thirty days.

@@ -537,6 +537,11 @@ async function probeFreeTier() {
     keepsake.includes("comes with the full journey"),
   );
 
+  // The *page*, not the id. Ten lines below this the journey gets bought, and
+  // a paid journey has no wall on it — reading it later would check a screen
+  // that no longer exists and quietly find nothing.
+  walledWallHtml = walled.text;
+
   // --- buying it -----------------------------------------------------------
 
   const upgrade = await owner.req("/api/checkout", {
@@ -577,6 +582,8 @@ async function probeFreeTier() {
     String((await db.user.findUnique({ where: { email: ownerEmail } }))?.freeTurnsUsed),
   );
 
+  // Hold on to a walled session before we buy the journey out of that state,
+  // so the refund check below can read the wall as the person standing at it.
   const showerAfter = await owner.req(`/w/${workspaceId}/shower`);
   check("the shower card opens", !showerAfter.text.includes("comes with the full journey"));
   const keepsakeAfter = await fetch(`${origin}/w/${workspaceId}/keepsake`).then((r) => r.text());
@@ -595,6 +602,88 @@ async function probeFreeTier() {
     String(upgradeTwice.status),
   );
 }
+
+/// Every surface that names a refund term names the same one.
+///
+/// Marzipan's, and it is the same rule as the due-date sentence one level up:
+/// a term restated in prose in several places goes wrong the moment one of
+/// them is edited, and it goes wrong confidently, in front of a customer.
+/// **This is not hypothetical.** Five live surfaces promised fourteen days
+/// against a thirty-day policy for twelve days, and it was caught only
+/// because somebody went looking.
+///
+/// Deliberately reads the *rendered pages* rather than grepping the source.
+/// What matters is what a customer is told, and a string that never reaches a
+/// screen is not a promise.
+///
+/// **Expect this to be red until PR #7 lands.** `/refunds`, the FAQ and
+/// `GiftForm` still say fourteen on this branch; `RefundNote`, written to the
+/// policy Elisabeth approved, says thirty. That disagreement is real and the
+/// point of this check is to refuse it rather than to let three people
+/// remember a merge order.
+async function probeRefundTermAgrees() {
+  section("The refund term, said the same way everywhere");
+
+  const origin = process.env.PROBE_ORIGIN;
+  if (!origin) {
+    console.log("  skip  needs a running server");
+    return;
+  }
+
+  // Every way of writing a length of time that has appeared in this copy.
+  //
+  // Matched case-insensitively, and that is not fussiness. The first version
+  // of this check was case-sensitive and silently skipped the FAQ entirely,
+  // because its answer opens the sentence — "Fourteen days from purchase".
+  // A cross-surface check that quietly covers one fewer surface than it
+  // claims to is worse than no check, and it is the third time tonight an
+  // instrument of mine has produced a finding about itself.
+  const TERMS = ["fourteen", "thirty", "14 days", "30 days"];
+  const termIn = (html: string) => {
+    const flat = html
+      .replace(/<!--.*?-->/g, "")
+      .replace(/&apos;|&#x27;/g, "'")
+      .toLowerCase();
+    return TERMS.filter((t) => flat.includes(t));
+  };
+
+  const surfaces: { where: string; html: string }[] = [
+    { where: "/refunds", html: await fetch(`${origin}/refunds`).then((r) => r.text()) },
+    { where: "/faq", html: await fetch(`${origin}/faq`).then((r) => r.text()) },
+    { where: "/gift (GiftForm)", html: await fetch(`${origin}/gift`).then((r) => r.text()) },
+  ];
+  if (walledWallHtml) {
+    // The wall is the newest surface and the only one behind a session, so it
+    // is also the one most likely to drift unnoticed.
+    surfaces.push({ where: "the wall (RefundNote)", html: walledWallHtml });
+  } else {
+    console.log("  note  the wall was not reached this run, so it is not covered here");
+  }
+
+  const found = surfaces
+    .map((s) => ({ ...s, terms: termIn(s.html) }))
+    .filter((s) => s.terms.length > 0);
+
+  for (const s of found) console.log(`         ${s.where}: ${s.terms.join(", ")}`);
+
+  const distinct = new Set(found.flatMap((s) => s.terms));
+  check(
+    "every surface that names a refund term names the same one",
+    distinct.size === 1,
+    distinct.size === 0
+      ? "no surface states a term at all — the promise has gone missing again"
+      : `${[...distinct].join(" vs ")} — merge #7 before #10`,
+  );
+  check(
+    "and at least one of them says it",
+    found.length > 0,
+    "nothing on any surface names a refund window",
+  );
+}
+
+/// The wall as it was rendered to the person standing at it, kept because the
+/// journey is bought a few lines later and the wall stops existing.
+let walledWallHtml: string | null = null;
 
 /// Two tabs, one last turn. Read-then-write would let both through.
 async function probeLastTurnRace() {
@@ -705,6 +794,7 @@ async function main() {
   await probeFreeTier();
   await probeLastTurnRace();
   await probeFailedTurnIsRefunded();
+  await probeRefundTermAgrees();
 
   console.log(`\n${passed} passed, ${failures.length} failed`);
   if (failures.length) {
