@@ -21,10 +21,32 @@ const jost = Jost({
   weight: ["300", "400", "500", "600"],
 });
 
+const DESCRIPTION =
+  "A private room where two people choose the name their child will carry — with an AI consultant to think it through, the people you love to draw on, and a keepsake at the end.";
+
 export const metadata: Metadata = {
+  // Absolute URLs are required for social cards, and a deployed app can't
+  // derive its own origin at build time. Same variable the magic links use,
+  // with the local port as the development fallback.
+  metadataBase: new URL(process.env.NAMESAKE_URL?.trim().replace(/\/+$/, "") || "http://localhost:3000"),
   title: "Namesake — the naming of a child",
-  description:
-    "A private room where two people choose the name their child will carry — with an AI consultant to think it through, the people you love to draw on, and a keepsake at the end.",
+  description: DESCRIPTION,
+  // Nearly every visit to this product starts with one person handing the
+  // link to another. Without these the handover arrives as bare grey text,
+  // and Pinterest — which needs an image to accept a pin at all — can't
+  // take it. The card itself is `opengraph-image.tsx`, alongside this file.
+  openGraph: {
+    type: "website",
+    siteName: "Namesake",
+    title: "Namesake — the naming of a child",
+    description: DESCRIPTION,
+    locale: "en_GB",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Namesake — the naming of a child",
+    description: DESCRIPTION,
+  },
 };
 
 export default function RootLayout({

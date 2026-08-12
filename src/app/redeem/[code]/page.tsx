@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { boughtForSomeoneElse } from "@/lib/purchase";
+import { supportAddress } from "@/lib/email";
 import EmailLinkForm from "@/components/EmailLinkForm";
 import RedeemPanel from "@/components/RedeemPanel";
 
@@ -46,6 +47,32 @@ export default async function RedeemPage(props: {
           className="mt-5 inline-block rounded-full bg-sage-deep px-6 py-3 font-display text-white transition hover:bg-pewter"
         >
           Go to your journeys
+        </Link>
+      </Shell>
+    );
+  }
+
+  // Refunded before anyone opened it, or the charge is being disputed. The form
+  // below would fail on submit anyway — `redeemPurchase` refuses both — but it
+  // would fail after they had typed out a due date and a baby's nickname, which
+  // is a cruel place to be told. A journey already opened never reaches here:
+  // its status is `redeemed` and it was answered above.
+  if (purchase.status === "refunded" || purchase.status === "disputed") {
+    return (
+      <Shell title="This link has been closed">
+        <p className="text-sm leading-relaxed text-ink-soft">
+          The payment behind this journey was reversed, so there&apos;s nothing here to open. If
+          that&apos;s a surprise — if someone gave this to you and you didn&apos;t know — write to{" "}
+          <a href={`mailto:${supportAddress()}`} className="underline">
+            {supportAddress()}
+          </a>{" "}
+          and we&apos;ll sort it out.
+        </p>
+        <Link
+          href="/"
+          className="mt-5 inline-block rounded-full bg-sage-deep px-6 py-3 font-display text-white transition hover:bg-pewter"
+        >
+          Start a journey
         </Link>
       </Shell>
     );

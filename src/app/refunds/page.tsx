@@ -5,12 +5,19 @@ import { supportAddress } from "@/lib/email";
 export const metadata = {
   title: "Namesake — refunds",
   description:
-    "Fourteen days from purchase, for any reason. Boxes refundable until posted; personalised keepsakes until they're made.",
+    "Thirty days from purchase, for any reason. The one exception is a keepsake already made with the name on it.",
 };
 
 // Written to be read by someone who is slightly annoyed. Short sentences,
 // no conditions hiding in a clause, and the awkward cases answered rather
 // than left to a conversation.
+//
+// One rule, not four. The window, boxes, keepsakes and extra time each used to
+// get a clause of their own, and four clauses read as four places to look for
+// the catch — which is the opposite of what a page like this is for. Thirty
+// days covers all of them; the single genuine exception is the only thing that
+// still needs saying, because it's the only case where the money can't come
+// back.
 export default function RefundsPage() {
   // Read per-render, not at module scope: this is the address a policy page
   // publishes, and it should follow the environment it's deployed into rather
@@ -40,15 +47,15 @@ export default function RefundsPage() {
           If it isn&apos;t <span className="italic text-sage-deep">right, say so.</span>
         </h1>
         <p className="mt-7 max-w-xl text-lg leading-relaxed text-ink-soft">
-          The short version: fourteen days from the day you bought it, for any reason at all.
+          The short version: thirty days from the day you bought it, for any reason at all.
           No form, no phone call, and nobody asking you to reconsider.
         </p>
       </section>
 
       <div className="space-y-11 pb-8">
-        <Clause q="Fourteen days, whatever the reason">
+        <Clause q="Thirty days, whatever the reason">
           <p>
-            Full refund within fourteen days of purchase. You don&apos;t need to have a reason,
+            Full refund within thirty days of purchase. You don&apos;t need to have a reason,
             and you don&apos;t need to explain the one you have.
           </p>
           <p>
@@ -56,31 +63,20 @@ export default function RefundsPage() {
             you bought it for.
           </p>
           <p>
-            After fourteen days the journey is yours for the window you bought. If something has
+            After thirty days the journey is yours for the window you bought. If something has
             genuinely gone wrong, write to us anyway — this is a policy, not a wall.
           </p>
         </Clause>
 
-        <Clause q="Boxes">
+        <Clause q="The one exception">
           <p>
-            Refundable in full until the box is posted. Once it&apos;s on its way we can&apos;t
-            recall it, but the journey inside it still follows the rule above — within fourteen
-            days, that part is refundable whether or not the box has gone.
+            A keepsake with their name already on it. Once it&apos;s made there is nobody else
+            it could go to, so it can&apos;t come back. Everything up to that point can —
+            including the journey it came from.
           </p>
-        </Clause>
-
-        <Clause q="Personalised keepsakes">
           <p>
-            An embroidered blanket, a framed print: refundable right up until
-            it&apos;s made, which only happens once the name is settled. After that it can&apos;t
-            be — it has their name on it, and there is nobody else it could go to.
-          </p>
-        </Clause>
-
-        <Clause q="Extra time">
-          <p>
-            Refundable within fourteen days, as long as the time you bought hasn&apos;t already
-            been used.
+            A box already in the post is the same: we can&apos;t recall it, though the journey
+            inside it still comes back.
           </p>
         </Clause>
 

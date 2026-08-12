@@ -63,7 +63,7 @@ export default async function GiftCardPage(props: { params: Promise<{ id: string
           <Row label="Lasts" value={tier ? describeWindow(tier.window) : "—"} />
           <Row label="Bought by" value={`${purchase.purchaserName ?? "—"} · ${purchase.purchaserEmail}`} />
           <Row label="For" value={purchase.recipientEmail ?? "no email — the card is the delivery"} />
-          <Row label="Status" value={purchase.status === "redeemed" ? "already opened" : "not yet opened"} />
+          <Row label="Status" value={purchase.redeemedAt ? "already opened" : "not yet opened"} />
         </dl>
       </div>
 
