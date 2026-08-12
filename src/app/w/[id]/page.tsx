@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { getWorkspaceState } from "@/lib/workspace";
 import { getMemberForWorkspace } from "@/lib/session";
 import Dashboard from "@/components/Dashboard";
+import { TIERS, formatPrice } from "@/lib/pricing";
 
 /// Where this app is being served from, for the share links.
 async function currentOrigin() {
@@ -60,6 +61,9 @@ export default async function WorkspacePage(props: {
       me={{ id: member.id, name: member.name, color: member.color }}
       origin={await currentOrigin()}
       showWelcome={welcome === "1"}
+      // Resolved here, on the server, where the env override is actually
+      // readable. See the prop's own note in Dashboard.
+      upgradePrice={formatPrice(TIERS.self_serve.amountCents, TIERS.self_serve.currency)}
     />
   );
 }

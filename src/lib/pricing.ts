@@ -8,6 +8,8 @@
 // Prices are inline rather than Stripe Price objects — no dashboard state to
 // drift out of sync with this file — and each is env-overridable.
 
+import { TRIAL_MONTHS } from "@/lib/trial";
+
 export type TierId = "sprout" | "bloom" | "whole_journey" | "self_serve";
 export type AddOnId = "blanket" | "framed_print" | "keepsake_set";
 
@@ -110,6 +112,41 @@ export const TIERS: Record<TierId, Tier> = {
     window: { rule: "months", months: 3 },
     physical: false,
   },
+};
+
+/// What a trial journey costs and how long it runs. Not in `TIERS`, and not on
+/// the storefront: nothing here is for sale, and a $0 row in a price list is a
+/// thing to explain rather than a thing to buy. It exists as a grant because
+/// that is how every journey in this product comes into being — see
+/// `createTrialGrant` in lib/purchase.ts.
+export const TRIAL = {
+  id: "trial" as const,
+  name: "Namesake, to try",
+  months: TRIAL_MONTHS,
+  amountCents: 0,
+  currency: "usd",
+};
+
+/// Turning a trial into the real thing. Same money and the same window as
+/// buying `self_serve` outright, because it *is* buying self_serve — the only
+/// difference is that the journey already exists, so this extends the one
+/// they're standing in rather than creating a second one.
+///
+/// Deliberately reads its price from the same env var as the tier it matches.
+/// Two prices for one thing is how a storefront ends up disagreeing with a
+/// paywall, and the paywall is the one nobody reviews.
+export const UPGRADE = {
+  id: "upgrade" as const,
+  get name() {
+    return `Continue with ${TIERS.self_serve.name}`;
+  },
+  get amountCents() {
+    return TIERS.self_serve.amountCents;
+  },
+  get window() {
+    return TIERS.self_serve.window;
+  },
+  currency: "usd",
 };
 
 /// Sold at the moment it's needed: you're past your due date and still talking

@@ -4,6 +4,7 @@ import DuckMark, { OrnamentRule } from "@/components/DuckMark";
 import TrackView from "@/components/TrackView";
 import { TIERS, formatPrice, describeWindow } from "@/lib/pricing";
 import { FUNNEL } from "@/lib/funnel";
+import { FREE_TURNS } from "@/lib/trial";
 
 export default function Home() {
   const plan = TIERS.self_serve;
@@ -74,8 +75,14 @@ export default function Home() {
         <section className="animate-rise rounded-[1.75rem] border border-line bg-card p-8 shadow-[0_28px_70px_-40px_rgba(65,74,69,0.45)]">
           <p className="engraved">Begin</p>
           <h2 className="mt-3 font-display text-3xl text-ink">Start your journey</h2>
+          {/* Says what free actually gets you rather than the word on its own.
+              A trial that doesn't name its limit is one somebody discovers,
+              and discovering a limit reads as a bait — which is the same
+              reason the counter in the chat is visible from the first turn
+              rather than the eighth. */}
           <p className="mb-7 mt-2 text-sm text-ink-soft">
-            {formatPrice(plan.amountCents, plan.currency)} for{" "}
+            Free to start: {FREE_TURNS} conversations with the consultant, your shortlist, and a
+            seat for your partner. {formatPrice(plan.amountCents, plan.currency)} continues it for{" "}
             {describeWindow(plan.window).toLowerCase()}. Everything here can change later.
           </p>
           <StartForm priceLabel={formatPrice(plan.amountCents, plan.currency)} />

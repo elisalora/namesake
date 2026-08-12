@@ -11,6 +11,8 @@ import {
 import {
   TIERS,
   EXTEND,
+  TRIAL,
+  UPGRADE,
   ADD_ONS,
   type AddOnId,
   type TierId,
@@ -190,6 +192,79 @@ export async function createCompGift(input: {
       suggestSlug: reserveSuggestSlug(),
       items: {
         create: [{ sku: "comp", name: "Namesake journey (gift)", amountCents: 0, physical: false }],
+      },
+    },
+    include: { items: true },
+  });
+}
+
+/// A trial journey, granted to nobody in particular until somebody proves an
+/// email address.
+///
+/// This is a Purchase for the same reason a comp is one: in this product a
+/// journey cannot come into existence except by redeeming a grant, and putting
+/// a second way in beside that would mean a second copy of every rule about
+/// who owns what. Born `paid`, worth nothing, and redeemed exactly the way a
+/// self-purchase is — which is also what keeps the sequencing intact. The
+/// workspace is created on the far side of a magic link, so the person who
+/// owns it has a verified address, and the free-turn count has something to
+/// hang on. Without that, a new address is a new trial and the counter is
+/// decoration.
+export async function createTrialGrant(input: { draft: JourneyDraft }) {
+  return db.purchase.create({
+    data: {
+      tier: TRIAL.id,
+      kind: "journey",
+      expiryRule: "months",
+      months: TRIAL.months,
+      amountCents: 0,
+      currency: TRIAL.currency,
+      purchaserEmail: normalizeEmail(input.draft.you.email),
+      purchaserName: input.draft.you.name,
+      draft: JSON.stringify(input.draft),
+      // Granted the moment it is made — there is nothing to pay, so there is
+      // nothing to wait for.
+      status: "paid",
+      paidAt: new Date(),
+      needsShipping: false,
+      redeemCode: redeemCode(),
+      suggestSlug: reserveSuggestSlug(),
+      items: {
+        create: [{ sku: TRIAL.id, name: TRIAL.name, amountCents: 0, physical: false }],
+      },
+    },
+    include: { items: true },
+  });
+}
+
+/// Buying the journey they are already in.
+///
+/// Shaped as an `extend` rather than a `journey`, because the workspace exists
+/// and everything in it is theirs — a `journey` purchase would build them a
+/// second, empty one and leave the shortlist they came for behind. That means
+/// `fulfillPurchase` needs no new branch: it pushes the window out from
+/// wherever it currently ends, and clears `isTrial` on the way past.
+export async function createUpgrade(workspaceId: string, purchaserEmail: string, name?: string) {
+  return db.purchase.create({
+    data: {
+      tier: TIERS.self_serve.id,
+      kind: "extend",
+      ...windowColumns(UPGRADE.window),
+      amountCents: UPGRADE.amountCents,
+      currency: UPGRADE.currency,
+      purchaserEmail: normalizeEmail(purchaserEmail),
+      purchaserName: name?.trim() || null,
+      workspaceId,
+      redeemCode: redeemCode(),
+      items: {
+        create: [
+          {
+            sku: TIERS.self_serve.id,
+            name: UPGRADE.name,
+            amountCents: UPGRADE.amountCents,
+            physical: false,
+          },
+        ],
       },
     },
     include: { items: true },
@@ -403,6 +478,9 @@ export async function fulfillPurchase(args: {
       // Checkout refuses these before any money moves; this is the backstop for
       // a purchase that was already in flight.
       if (ws.expiresAt === null) {
+        // Still stop charging them for the consultant, even in the one case
+        // where the time they bought does nothing. They paid.
+        if (ws.isTrial) await tx.workspace.update({ where: { id: ws.id }, data: { isTrial: false } });
         await tx.purchase.update({
           where: { id: purchase.id },
           data: { status: "redeemed", paidAt: now, redeemedAt: now, stripeSessionId, stripePaymentIntentId, ...shipping },
@@ -417,7 +495,20 @@ export async function fulfillPurchase(args: {
       const base = ws.expiresAt > now ? ws.expiresAt : now;
       await tx.workspace.update({
         where: { id: ws.id },
-        data: { expiresAt: resolveExpiry(purchase, base) },
+        data: {
+          expiresAt: resolveExpiry(purchase, base),
+          // The moment anybody's money reaches this journey it stops being a
+          // trial — the consultant stops costing either parent a free turn,
+          // and the shower card and the keepsake open. One write, in the same
+          // transaction as the window it comes with, so a journey can never be
+          // paid for and still charging for turns.
+          //
+          // Note *either* parent. The window is a fact about the workspace, so
+          // one person paying has always covered both seats; this makes the
+          // turns behave the same way, which is what the wall promises out
+          // loud: "whenever either of you continues, it opens for both".
+          isTrial: false,
+        },
       });
       await tx.purchase.update({
         where: { id: purchase.id },
@@ -742,6 +833,11 @@ export async function redeemPurchase(
         expiresAt,
         client: tx,
         suggestSlug: purchase.suggestSlug,
+        // A comp is not a trial. It grants the whole product, deliberately —
+        // that is the point of `/admin/codes`, and the seeding experiment
+        // depends on those people meeting the real Extend button rather than
+        // a turn counter.
+        isTrial: purchase.tier === TRIAL.id,
       });
       await tx.purchase.update({
         where: { id: purchase.id },

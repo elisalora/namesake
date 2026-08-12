@@ -79,6 +79,9 @@ export default async function RedeemPage(props: {
   }
 
   const isGift = purchase.kind === "gift";
+  // A free start comes through this same page, and "Your journey is paid for"
+  // would be the first thing it said to somebody who has not paid for it.
+  const isTrial = purchase.tier === "trial";
 
   // Paid via Stripe but the webhook hasn't landed yet — a second or two, and
   // the client below polls rather than making them refresh by hand.
@@ -140,7 +143,9 @@ export default async function RedeemPage(props: {
         title={
           isGift
             ? `${purchase.purchaserName || "Someone"} gave you a Namesake journey`
-            : "Your journey is paid for"
+            : isTrial
+              ? "Your journey is ready"
+              : "Your journey is paid for"
         }
       >
         {isGift && purchase.giftMessage && (
@@ -150,6 +155,8 @@ export default async function RedeemPage(props: {
         )}
         <p className="text-sm leading-relaxed text-ink-soft">
           Pop in your email and we&apos;ll send a link that signs you in and opens it.
+          {isTrial &&
+            " No card, and nothing to cancel — the link is what makes the journey yours."}
         </p>
         <div className="mt-6">
           <EmailLinkForm
@@ -164,6 +171,8 @@ export default async function RedeemPage(props: {
 
   return (
     <Shell title={isGift ? "Let's set up your journey" : "Your journey is ready"}>
+      {/* Same panel the paid path uses. The trial's grant already carries the
+          draft they filled in, so there is nothing more to ask them. */}
       <RedeemPanel
         code={code}
         needsDetails={isGift}

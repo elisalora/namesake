@@ -86,6 +86,9 @@ export async function createJourney(
     /// Reserved on the purchase so the shower card could be printed before
     /// this journey existed. Use it, or the card in the box points nowhere.
     suggestSlug?: string | null;
+    /// Nobody has paid for this one. See lib/trial.ts for what that costs
+    /// them, which is less than it sounds.
+    isTrial?: boolean;
   } = {},
 ) {
   const client = opts.client ?? db;
@@ -103,6 +106,7 @@ export async function createJourney(
       // the guard lives at the write rather than only at the door.
       dueDate: parseDueDate(draft.dueDate),
       expiresAt: opts.expiresAt ?? null,
+      isTrial: opts.isTrial ?? false,
       suggestSlug: opts.suggestSlug || slugId(),
       members: {
         create: [

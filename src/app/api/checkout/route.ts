@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { originFrom, getCurrentUser } from "@/lib/auth";
 import { journeyDraft } from "@/lib/journey";
 import { getMemberForWorkspace } from "@/lib/session";
-import { createPurchase, createExtension, startCheckout } from "@/lib/purchase";
+import { createPurchase, createExtension, createUpgrade, startCheckout } from "@/lib/purchase";
 import { TIERS, isTierId, isAddOnId } from "@/lib/pricing";
 import { trackFunnel } from "@/lib/analytics";
 import { FUNNEL } from "@/lib/funnel";
@@ -60,6 +60,12 @@ const schema = z.discriminatedUnion("kind", [
   }),
   // More time on a journey you're already part of.
   z.object({ kind: z.literal("extend"), workspaceId: z.string().min(1) }),
+  // Buying the journey you're already in, from the wall at the end of the
+  // free trial. Its own kind rather than an `extend`, even though it is
+  // fulfilled as one: extend is *more* time on something already paid for and
+  // this is the first payment, they cost different amounts, and only one of
+  // them may be bought twice.
+  z.object({ kind: z.literal("upgrade"), workspaceId: z.string().min(1) }),
 ]);
 
 export async function POST(request: Request) {
@@ -74,7 +80,32 @@ export async function POST(request: Request) {
   const origin = originFrom(request);
 
   let purchase;
-  if (input.kind === "extend") {
+  if (input.kind === "upgrade") {
+    // Plain membership, not write access: somebody out of free turns is
+    // exactly who this is for, and a journey whose window has also closed is
+    // still theirs to buy.
+    const member = await getMemberForWorkspace(input.workspaceId);
+    const user = await getCurrentUser();
+    if (!member || !user) return NextResponse.json({ error: "Not your journey." }, { status: 403 });
+
+    const ws = await db.workspace.findUnique({
+      where: { id: input.workspaceId },
+      select: { isTrial: true },
+    });
+    if (!ws) return NextResponse.json({ error: "Not your journey." }, { status: 403 });
+    // Both parents can be standing at the wall at once, and the far side of
+    // this is a real charge. If the other one has already paid — or if this
+    // browser is a stale tab from before they did — say so rather than
+    // selling the same journey twice.
+    if (!ws.isTrial) {
+      return NextResponse.json(
+        { error: "This journey is already yours — try refreshing." },
+        { status: 409 },
+      );
+    }
+
+    purchase = await createUpgrade(input.workspaceId, user.email, member.name);
+  } else if (input.kind === "extend") {
     // Only someone already in the journey may buy time for it — and note this
     // deliberately uses plain membership, not write access: an expired journey
     // is precisely when someone needs to extend.
