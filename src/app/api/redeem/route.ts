@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { journeyDraft } from "@/lib/journey";
 import { redeemPurchase } from "@/lib/purchase";
 import { sendPartnerInvite } from "@/lib/invite";
+import { supportAddress } from "@/lib/email";
 import { originFrom } from "@/lib/auth";
 
 const schema = z.object({
@@ -13,14 +14,23 @@ const schema = z.object({
   details: journeyDraft.optional(),
 });
 
-const MESSAGES: Record<string, string> = {
-  invalid: "We don't recognise that link.",
-  unpaid: "That payment hasn't come through yet. Give it a moment and refresh.",
-  spent: "That gift has already been opened.",
-  "needs-details": "We still need a few details about the journey.",
-  malformed: "Something was missing from those details.",
-  "not-yours": "This gift is for someone else — it's theirs to open.",
-};
+// A function rather than a constant so the support address is read when the
+// request is served, not when the module is first imported.
+function messageFor(reason: string) {
+  const messages: Record<string, string> = {
+    invalid: "We don't recognise that link.",
+    unpaid: "That payment hasn't come through yet. Give it a moment and refresh.",
+    // Whoever is reading this may not be the person the money went back to — a
+    // gift recipient has no way to know — so it says what happened and where to
+    // ask, rather than treating them as at fault.
+    "payment-reversed": `The payment behind this journey was reversed, so there's nothing here to open. If that's a surprise, write to ${supportAddress()} and we'll sort it out.`,
+    spent: "That gift has already been opened.",
+    "needs-details": "We still need a few details about the journey.",
+    malformed: "Something was missing from those details.",
+    "not-yours": "This gift is for someone else — it's theirs to open.",
+  };
+  return messages[reason] ?? "That didn't work.";
+}
 
 /// Lets the redeem page wait out the gap between Stripe redirecting the browser
 /// and the webhook confirming the payment.
@@ -59,8 +69,13 @@ export async function POST(request: Request) {
 
   const result = await redeemPurchase(parsed.data.code, user, parsed.data.details);
   if (!result.ok) {
-    const status = result.reason === "unpaid" ? 409 : result.reason === "not-yours" ? 403 : 400;
-    return NextResponse.json({ error: MESSAGES[result.reason] ?? "That didn't work." }, { status });
+    const status =
+      result.reason === "unpaid"
+        ? 409
+        : result.reason === "not-yours" || result.reason === "payment-reversed"
+          ? 403
+          : 400;
+    return NextResponse.json({ error: messageFor(result.reason) }, { status });
   }
 
   // Give the new owner a name if we've never had one for them.

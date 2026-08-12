@@ -362,6 +362,7 @@ export type FulfillResult =
 export async function fulfillPurchase(args: {
   purchaseId: string;
   stripeSessionId?: string | null;
+  stripePaymentIntentId?: string | null;
   shipping?: { name?: string | null; address?: unknown } | null;
   origin: string;
   /// The incoming request's headers, for the one analytics event that means
@@ -376,6 +377,10 @@ export async function fulfillPurchase(args: {
 
     const now = new Date();
     const stripeSessionId = args.stripeSessionId ?? purchase.stripeSessionId;
+    // Recorded here and nowhere else: this is the only moment we hold both the
+    // purchase and the charge behind it. A refund arrives later as a charge
+    // event with no session on it, and this is what makes it findable.
+    const stripePaymentIntentId = args.stripePaymentIntentId ?? purchase.stripePaymentIntentId;
     const shipping = args.shipping?.address
       ? {
           shippingName: args.shipping.name ?? null,
@@ -400,7 +405,7 @@ export async function fulfillPurchase(args: {
       if (ws.expiresAt === null) {
         await tx.purchase.update({
           where: { id: purchase.id },
-          data: { status: "redeemed", paidAt: now, redeemedAt: now, stripeSessionId, ...shipping },
+          data: { status: "redeemed", paidAt: now, redeemedAt: now, stripeSessionId, stripePaymentIntentId, ...shipping },
         });
         console.warn(
           `[namesake] extension ${purchase.id} applied to journey ${ws.id}, which never expires — ` +
@@ -416,14 +421,14 @@ export async function fulfillPurchase(args: {
       });
       await tx.purchase.update({
         where: { id: purchase.id },
-        data: { status: "redeemed", paidAt: now, redeemedAt: now, stripeSessionId, ...shipping },
+        data: { status: "redeemed", paidAt: now, redeemedAt: now, stripeSessionId, stripePaymentIntentId, ...shipping },
       });
       return { state: "extended" as const, purchase };
     }
 
     await tx.purchase.update({
       where: { id: purchase.id },
-      data: { status: "paid", paidAt: now, stripeSessionId, ...shipping },
+      data: { status: "paid", paidAt: now, stripeSessionId, stripePaymentIntentId, ...shipping },
     });
     return { state: "granted" as const, purchase };
   });
@@ -496,11 +501,169 @@ export async function fulfillPurchase(args: {
   return { ok: true, state: "granted", purchaseId: purchase.id, redeemUrl };
 }
 
+/* ------------------------------------------------- refunds and disputes */
+
+/// Find the purchase behind a charge.
+///
+/// Refunds and disputes are charge events. They carry a payment intent, never a
+/// checkout session — and until this change the only Stripe id on a purchase
+/// was the session's, which is why none of them could be matched to anything.
+///
+/// New purchases record the intent at fulfillment. Anything paid for before
+/// that has to be looked up the long way round: ask Stripe which session the
+/// intent belongs to, then match on the session id we do have. One extra API
+/// call, on an event that arrives a handful of times a year.
+/// Takes the intent rather than the charge because a dispute is not a charge —
+/// it carries its own `payment_intent`, and going via the charge id would cost
+/// a second round trip to learn what the event already told us.
+async function findPurchaseForIntent(source: {
+  payment_intent?: string | { id: string } | null;
+}) {
+  const intentId =
+    typeof source.payment_intent === "string" ? source.payment_intent : source.payment_intent?.id;
+  if (!intentId) return null;
+
+  const direct = await db.purchase.findUnique({ where: { stripePaymentIntentId: intentId } });
+  if (direct) return direct;
+
+  const stripe = getStripe();
+  if (!stripe) return null;
+
+  const sessions = await stripe.checkout.sessions
+    .list({ payment_intent: intentId, limit: 1 })
+    .catch((err) => {
+      console.error("[namesake] could not look up the session for", intentId, err);
+      return null;
+    });
+  const sessionId = sessions?.data[0]?.id;
+  if (!sessionId) return null;
+
+  const found = await db.purchase.findUnique({ where: { stripeSessionId: sessionId } });
+  // Backfill it, so a second event about the same charge doesn't pay the toll
+  // again — a dispute is usually followed by a resolution.
+  if (found && !found.stripePaymentIntentId) {
+    await db.purchase
+      .update({ where: { id: found.id }, data: { stripePaymentIntentId: intentId } })
+      .catch(() => {});
+  }
+  return found;
+}
+
+/// What a purchase's status should be when the money is no longer in question —
+/// which is not always `paid`, because the grant may already have been claimed.
+function settledStatus(purchase: { redeemedAt: Date | null }) {
+  return purchase.redeemedAt ? "redeemed" : "paid";
+}
+
+export type MoneyBackResult =
+  | { ok: true; purchaseId: string; state: "refunded" | "disputed" | "restored" | "unchanged" }
+  | { ok: false; reason: "unknown-charge" | "partial" };
+
+/// The money went back. Record it, and stop the grant if nobody has used it.
+///
+/// The rule, deliberately: a refund closes an *unopened* grant and leaves an
+/// opened one alone. Someone who was refunded before redeeming has had the
+/// whole transaction undone and should not still be holding a working link.
+/// Someone who has already opened the journey has written in it — names,
+/// reasons, a conversation with the consultant — and taking that away over a
+/// $10 refund is the worst last impression the product could leave. The money
+/// is separable from the journey here in a way it isn't in most software.
+///
+/// So: `status` becomes `refunded` either way (it describes the money, and the
+/// packing list and the redeem check both read it), and `redeemedAt` is
+/// untouched, so an opened journey stays opened and its owner keeps their
+/// access. Nothing revokes a workspace.
+export async function refundPurchase(charge: Stripe.Charge): Promise<MoneyBackResult> {
+  const purchase = await findPurchaseForIntent(charge);
+  if (!purchase) return { ok: false, reason: "unknown-charge" };
+
+  // `charge.refunded` also fires for partial refunds — a shipping adjustment,
+  // a goodwill discount — and those buy nothing back. Only a charge refunded
+  // down to nothing undoes the purchase.
+  if (charge.amount_refunded < charge.amount) return { ok: false, reason: "partial" };
+
+  if (purchase.status === "refunded") {
+    return { ok: true, purchaseId: purchase.id, state: "unchanged" };
+  }
+
+  await db.purchase.update({
+    where: { id: purchase.id },
+    data: { status: "refunded", refundedAt: new Date() },
+  });
+
+  if (purchase.needsShipping && !purchase.fulfilledAt) {
+    console.warn(
+      `[namesake] refunded ${purchase.id} was still waiting to be packed — pulled from the list.`,
+    );
+  }
+
+  return { ok: true, purchaseId: purchase.id, state: "refunded" };
+}
+
+/// A chargeback has been opened. Not a refund yet — the bank may side with us —
+/// but a box posted now is a box posted against money that is being taken back,
+/// and an unopened grant claimed now is one claimed while the payment for it is
+/// contested. Both stop until it resolves.
+export async function disputePurchase(dispute: Stripe.Dispute): Promise<MoneyBackResult> {
+  const purchase = await findPurchaseForIntent(dispute);
+  if (!purchase) return { ok: false, reason: "unknown-charge" };
+  if (purchase.status === "refunded" || purchase.status === "disputed") {
+    return { ok: true, purchaseId: purchase.id, state: "unchanged" };
+  }
+
+  await db.purchase.update({ where: { id: purchase.id }, data: { status: "disputed" } });
+  return { ok: true, purchaseId: purchase.id, state: "disputed" };
+}
+
+/// A dispute closed. Won means the money stayed with us and the purchase goes
+/// back to exactly where it was — including `redeemed`, if the journey had
+/// already been opened when the chargeback landed. Lost means the money is
+/// gone, which is a refund by another name.
+export async function resolveDispute(
+  dispute: Stripe.Dispute,
+  outcome: "won" | "lost",
+): Promise<MoneyBackResult> {
+  const purchase = await findPurchaseForIntent(dispute);
+  if (!purchase) return { ok: false, reason: "unknown-charge" };
+
+  if (outcome === "lost") {
+    if (purchase.status === "refunded") {
+      return { ok: true, purchaseId: purchase.id, state: "unchanged" };
+    }
+    await db.purchase.update({
+      where: { id: purchase.id },
+      data: { status: "refunded", refundedAt: new Date() },
+    });
+    return { ok: true, purchaseId: purchase.id, state: "refunded" };
+  }
+
+  // Only undo what the dispute itself did. A purchase refunded outright while
+  // the dispute was open stays refunded.
+  if (purchase.status !== "disputed") {
+    return { ok: true, purchaseId: purchase.id, state: "unchanged" };
+  }
+  await db.purchase.update({
+    where: { id: purchase.id },
+    data: { status: settledStatus(purchase) },
+  });
+  return { ok: true, purchaseId: purchase.id, state: "restored" };
+}
+
 /* -------------------------------------------------------------- redeeming */
 
 export type RedeemPurchaseResult =
   | { ok: true; workspaceId: string; inviteToken: string; expiresAt: Date }
-  | { ok: false; reason: "invalid" | "unpaid" | "spent" | "needs-details" | "malformed" | "not-yours" };
+  | {
+      ok: false;
+      reason:
+        | "invalid"
+        | "unpaid"
+        | "payment-reversed"
+        | "spent"
+        | "needs-details"
+        | "malformed"
+        | "not-yours";
+    };
 
 /// Whether this grant is one the person holding it bought *for someone else*.
 ///
@@ -543,6 +706,17 @@ export async function redeemPurchase(
     return { ok: false, reason: "invalid" };
   }
   if (purchase.status === "redeemed") return { ok: false, reason: "spent" };
+  // Money back, and nobody had opened it — the transaction is undone, so the
+  // link that was paid for stops working. Said plainly rather than folded into
+  // "unpaid", which would tell someone to wait for a payment that is not coming.
+  //
+  // One reason covers both states on purpose. Stripe withdraws the funds the
+  // moment a dispute opens, so "the payment was reversed" is true of each, and
+  // the person holding a gift link is owed an explanation without being told
+  // about a chargeback on somebody else's card.
+  if (purchase.status === "refunded" || purchase.status === "disputed") {
+    return { ok: false, reason: "payment-reversed" };
+  }
   if (purchase.status !== "paid") return { ok: false, reason: "unpaid" };
   if (boughtForSomeoneElse(purchase, owner.email)) return { ok: false, reason: "not-yours" };
 

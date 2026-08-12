@@ -23,7 +23,13 @@ export default async function OrdersPage(props: {
   const orders = await db.purchase.findMany({
     where: {
       needsShipping: true,
-      status: { in: ["paid", "redeemed"] },
+      // Outstanding means money we're still holding. A refunded or disputed
+      // order must not be on this list — packing and posting one is the second
+      // half of a loss — but it stays visible under "show all", because an
+      // order that vanishes without explanation is its own kind of confusing.
+      status: showAll
+        ? { in: ["paid", "redeemed", "refunded", "disputed"] }
+        : { in: ["paid", "redeemed"] },
       ...(showAll ? {} : { fulfilledAt: null }),
     },
     orderBy: { paidAt: "asc" },
@@ -66,6 +72,8 @@ export default async function OrdersPage(props: {
             // the first name to arrive.
             const waitingOnName =
               order.items.some((i) => i.shipsAfterNaming) && order.workspace?.status !== "decided";
+            const moneyBack =
+              order.status === "refunded" ? "Refunded" : order.status === "disputed" ? "Disputed" : null;
 
             return (
               <li
@@ -95,12 +103,24 @@ export default async function OrdersPage(props: {
                       <span className="text-sm text-ink-soft">
                         Shipped {order.fulfilledAt.toISOString().slice(0, 10)}
                       </span>
+                    ) : moneyBack ? (
+                      // No "mark fulfilled" button on an order nobody should be
+                      // packing.
+                      <span className="text-sm font-semibold text-ink-soft">Don&apos;t pack</span>
                     ) : (
                       <MarkFulfilled purchaseId={order.id} />
                     )}
                   </span>
                 </div>
 
+                {moneyBack && (
+                  <p className="mt-3 rounded-xl border border-dashed border-line bg-paper px-4 py-2 text-sm font-semibold text-ink">
+                    {moneyBack === "Refunded"
+                      ? `Refunded${order.refundedAt ? ` on ${order.refundedAt.toISOString().slice(0, 10)}` : ""} — do not pack or post this.`
+                      : "A chargeback is open on this — do not pack or post it until it resolves."}
+                    {order.fulfilledAt ? " It had already shipped." : ""}
+                  </p>
+                )}
                 {waitingOnName && (
                   <p className="mt-3 rounded-xl border border-dashed border-line bg-paper px-4 py-2 text-sm text-ink-soft">
                     Includes a keepsake that needs the name — they haven&apos;t chosen yet.
