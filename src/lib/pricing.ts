@@ -1,8 +1,11 @@
 // Namesake — the product catalog.
 //
 // Two audiences, and the catalog is shaped around that: the gifter buys, the
-// couple uses. Gift tiers are anchored on Bloom, which is the one designed to
-// be handed over at a shower.
+// couple uses. Gift tiers are anchored on The Gift, which is the one designed
+// to be handed over at a shower.
+//
+// Nothing here ships. Everything physical was withdrawn once it was clear the
+// only person who could make it was the founder — see `ADD_ONS_FOR_SALE`.
 //
 // Everything is a one-time payment. Naming ends, so nothing auto-renews.
 // Prices are inline rather than Stripe Price objects — no dashboard state to
@@ -10,7 +13,7 @@
 
 import { TRIAL_MONTHS } from "@/lib/trial";
 
-export type TierId = "sprout" | "bloom" | "whole_journey" | "self_serve";
+export type TierId = "sprout" | "the_gift" | "whole_journey" | "self_serve";
 export type AddOnId = "blanket" | "framed_print" | "keepsake_set";
 
 /// How long a purchase grants.
@@ -69,21 +72,23 @@ export const TIERS: Record<TierId, Tier> = {
     window: { rule: "months", months: 1 },
     physical: false,
   },
-  bloom: {
-    id: "bloom",
+  // COPY PLACEHOLDER — Marzipan owns name/tagline/blurb. Replace, don't work
+  // around. The structure is settled: featured, three months, nothing ships.
+  //
+  // Deliberately says nothing about a printable card. The card exists, but only
+  // behind `/admin/orders/[id]/card` — until a buyer can reach it, promising it
+  // on the storefront is selling something we don't hand over.
+  the_gift: {
+    id: "the_gift",
     kind: "gift",
-    name: "Bloom",
-    tagline: "The shower gift, in a box",
+    name: "The Gift",
+    tagline: "Three months to choose",
     blurb:
-      "The same thing, three months of it, arriving as something you can put in their hands at the shower — bow and all.",
-    amountCents: cents("NAMESAKE_PRICE_BLOOM_CENTS", 6500),
+      "The whole thing for three months — long enough to change their minds twice — sent to them with your note on it.",
+    amountCents: cents("NAMESAKE_PRICE_GIFT_CENTS", 3900),
     currency: "usd",
     window: { rule: "months", months: 3 },
-    physical: true,
-    boxContents: [
-      "A card in your own words, carrying the link that opens it",
-      "A second card for the gift table, so the room can suggest names",
-    ],
+    physical: false,
     featured: true,
   },
   whole_journey: {
@@ -93,7 +98,10 @@ export const TIERS: Record<TierId, Tier> = {
     tagline: "Until the baby arrives",
     blurb:
       "Everything, lasting the rest of the pregnancy and a week past the due date — because babies keep their own schedules.",
-    amountCents: cents("NAMESAKE_PRICE_WHOLE_JOURNEY_CENTS", 5000),
+    // $59 against The Gift's $39. The ladder used to invert here — the
+    // featured tier cost more and lasted less, so a gifter comparing the two
+    // side by side was argued down it.
+    amountCents: cents("NAMESAKE_PRICE_WHOLE_JOURNEY_CENTS", 5900),
     currency: "usd",
     // Resolved when they redeem and tell us the due date; nine months if they
     // would rather not say.
@@ -161,6 +169,9 @@ export const EXTEND = {
   window: { rule: "months", months: 1 } satisfies AccessWindow,
 };
 
+/// The catalog of record, not the shelf. None of these are on sale — see
+/// `ADD_ONS_FOR_SALE` — but past orders still have to resolve their names and
+/// prices, and the packing list still has to read.
 export const ADD_ONS: Record<AddOnId, AddOn> = {
   blanket: {
     id: "blanket",
@@ -188,14 +199,25 @@ export const ADD_ONS: Record<AddOnId, AddOn> = {
   },
 };
 
-export const GIFT_TIERS: Tier[] = [TIERS.sprout, TIERS.bloom, TIERS.whole_journey];
+export const GIFT_TIERS: Tier[] = [TIERS.sprout, TIERS.the_gift, TIERS.whole_journey];
+
+/// Which add-ons can actually be bought right now — the single gate every
+/// storefront and every checkout route reads.
+///
+/// Empty, and deliberately so: all three are made and posted by hand, by one
+/// person, and every sale is an obligation she'd have to work off herself.
+/// `ADD_ONS` stays as the catalog of record so historical orders still resolve
+/// and so this is one line to reverse the day somebody else can make them.
+export const ADD_ONS_FOR_SALE: AddOnId[] = [];
 
 export function isTierId(value: string): value is TierId {
   return value in TIERS;
 }
 
-export function isAddOnId(value: string): value is AddOnId {
-  return value in ADD_ONS;
+/// Deliberately narrower than "is a known add-on". Nothing may be bought that
+/// isn't on sale, whichever route the request arrives on.
+export function isAddOnForSale(value: string): value is AddOnId {
+  return (ADD_ONS_FOR_SALE as string[]).includes(value);
 }
 
 export function formatPrice(amountCents: number, currency = "usd") {

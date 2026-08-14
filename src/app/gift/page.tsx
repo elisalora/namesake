@@ -1,7 +1,7 @@
 import Link from "next/link";
 import GiftForm from "@/components/GiftForm";
 import DuckMark, { OrnamentRule } from "@/components/DuckMark";
-import { GIFT_TIERS, ADD_ONS, formatPrice, describeWindow } from "@/lib/pricing";
+import { GIFT_TIERS, ADD_ONS, ADD_ONS_FOR_SALE, formatPrice, describeWindow } from "@/lib/pricing";
 
 const DESCRIPTION =
   "A gift for expecting parents: the way to choose their child's name. A private room for the two of them, a card the whole shower can scan, and the story of the name at the end.";
@@ -41,7 +41,7 @@ export default function GiftPage() {
     featured: Boolean(t.featured),
   }));
 
-  const addOns = Object.values(ADD_ONS).map((a) => ({
+  const addOns = ADD_ONS_FOR_SALE.map((id) => ADD_ONS[id]).map((a) => ({
     id: a.id,
     name: a.name,
     blurb: a.blurb,
@@ -82,15 +82,19 @@ export default function GiftPage() {
 
         {/* The question a gifter actually has, answered before the prices. */}
         <ol className="mx-auto mt-12 grid max-w-3xl gap-8 text-left sm:grid-cols-3">
+          {/* COPY PLACEHOLDER — Marzipan. Step two used to describe a box
+              arriving in the post. Nothing ships now. It stays inbox-only
+              until a buyer can actually reach the printable card; the moment
+              that route lands, this is the sentence that should change. */}
           {[
-            ["You choose", "Pick how long it lasts and write them a note. We'll ask where to post it."],
+            ["You choose", "Pick how long it lasts and write them a note."],
             [
-              "You hand it over",
-              "The box comes to you, so you can give it in person. Or send it straight to their inbox.",
+              "It arrives",
+              "Your note and the link that opens it go straight to their inbox, the minute you've paid.",
             ],
             [
               "They open it",
-              "They scan the card, set up their room, and start choosing the name.",
+              "They follow the link, set up their room, and start choosing the name.",
             ],
           ].map(([t, d], i) => (
             <li key={t}>
@@ -109,7 +113,7 @@ export default function GiftPage() {
       <section className="mt-16 grid gap-4 sm:grid-cols-3">
         {[
           [
-            "Your voice, on the card",
+            "Your voice, first",
             "Your note is the first thing they read — and you can put a name forward yourself, without being the relative who pushes.",
           ],
           [
