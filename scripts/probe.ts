@@ -664,9 +664,25 @@ async function probeCheckSurfaces() {
   check("robots.txt is served at all — it was a 404", robots.status === 200, String(robots.status));
   check("it points at the sitemap", robotsText.includes("/sitemap.xml"));
   // The private rooms. Unguessable is not unlisted.
-  for (const path of ["/w/", "/s/", "/join/", "/redeem/", "/auth/", "/api/", "/admin", "/check/card"]) {
+  for (const path of ["/w/", "/s/", "/join/", "/redeem/", "/auth/", "/api/", "/admin"]) {
     check(`it keeps crawlers out of ${path}`, robotsText.includes(`Disallow: ${path}`), robotsText);
   }
+  // And the one that must NOT be disallowed, asserted as loudly as the ones
+  // that must. A `noindex` is only obeyed on a URL a crawler is allowed to
+  // fetch; disallowing this one would leave Google free to index
+  // `/check/card?first=…&last=…` as a bare URL — the child's name — with no way
+  // left to tell it not to. The header below is what does the work.
+  check(
+    "and it does NOT disallow /check/card, because that is what lets the noindex be read",
+    !robotsText.includes("Disallow: /check/card"),
+    robotsText,
+  );
+  check(
+    "which only holds because the card says noindex itself",
+    (await fetch(`${origin}/check/card?first=Ada&last=Whitfield`)).headers
+      .get("x-robots-tag")
+      ?.includes("noindex") === true,
+  );
 
   const sitemap = await fetch(`${origin}/sitemap.xml`);
   const sitemapText = await sitemap.text();

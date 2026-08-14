@@ -38,11 +38,29 @@ export default function robots(): MetadataRoute.Robots {
         "/redeem/",
         "/auth/",
         "/journeys",
-        // The share card. It renders whatever name is in its query string, so
-        // an indexed one is a page of ours about a stranger's child. The route
-        // sets `X-Robots-Tag: noindex` as well — this is the half that stops
-        // it being fetched in the first place.
-        "/check/card",
+        // `/check/card` is deliberately NOT in this list, and the reason is the
+        // opposite of the obvious one.
+        //
+        // It renders whatever name is in its query string, so an indexed one
+        // would be a page of ours about a stranger's child — and the first
+        // version of this file disallowed it for exactly that reason. That was
+        // backwards. Google is explicit: a `noindex` is only obeyed if the URL
+        // can be crawled, because a crawler that is refused the fetch never
+        // reads the header. A disallowed URL that Google finds a link to can
+        // still be indexed *as a URL*, without content.
+        //
+        // For this route the sensitive part IS the URL — the child's name is in
+        // the query string. So a Disallow buys the worst outcome available:
+        // Google may list `/check/card?first=…&last=…` as a bare result and can
+        // never be told to drop it. Allowing the fetch means it reads
+        // `X-Robots-Tag: noindex, noimageindex` and keeps nothing.
+        //
+        // The discovery path is not hypothetical: a pin links the card, which
+        // is precisely how a crawler would meet one of these URLs.
+        //
+        // It also means Pinterestbot — which respects robots.txt, and is the
+        // one crawler this route exists to serve — is no longer told to stay
+        // away from the image the page asks people to save.
       ],
     },
     sitemap: `${base}/sitemap.xml`,
