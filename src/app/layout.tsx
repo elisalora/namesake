@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Jost } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { siteUrl } from "@/lib/siteUrl";
 import "./globals.css";
 
 // Cormorant for display: a high-contrast old-style serif, the lettering you'd
@@ -27,8 +28,9 @@ const DESCRIPTION =
 export const metadata: Metadata = {
   // Absolute URLs are required for social cards, and a deployed app can't
   // derive its own origin at build time. Same variable the magic links use,
-  // with the local port as the development fallback.
-  metadataBase: new URL(process.env.NAMESAKE_URL?.trim().replace(/\/+$/, "") || "http://localhost:3000"),
+  // with the local port as the development fallback. `siteUrl` is the forgiving
+  // half of that pair — see lib/siteUrl.ts for the half that refuses.
+  metadataBase: new URL(siteUrl()),
   title: "Namesake — the naming of a child",
   description: DESCRIPTION,
   // Nearly every visit to this product starts with one person handing the

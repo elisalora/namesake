@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import StartForm from "@/components/StartForm";
+import StartHandoff from "@/components/StartHandoff";
 import DuckMark, { OrnamentRule } from "@/components/DuckMark";
 import TrackView from "@/components/TrackView";
 import { TIERS, formatPrice, describeWindow } from "@/lib/pricing";
@@ -19,6 +21,11 @@ export default function Home() {
           <span className="font-display text-2xl tracking-tight text-pewter">Namesake</span>
         </div>
         <div className="flex items-center gap-6 text-sm text-ink-soft">
+          {/* A page nothing links to is a page nothing finds — a sitemap entry
+              is a suggestion, an internal link is the path. */}
+          <Link href="/check" className="transition hover:text-sage-deep">
+            Check a name
+          </Link>
           <Link href="/faq" className="transition hover:text-sage-deep">
             Questions
           </Link>
@@ -85,7 +92,12 @@ export default function Home() {
             seat for your partner. {formatPrice(plan.amountCents, plan.currency)} continues it for{" "}
             {describeWindow(plan.window).toLowerCase()}. Everything here can change later.
           </p>
-          <StartForm priceLabel={formatPrice(plan.amountCents, plan.currency)} />
+          {/* The fallback is the same form without the handoff, so what gets
+              prerendered is a working start form rather than a skeleton —
+              somebody arriving straight here never waits for anything. */}
+          <Suspense fallback={<StartForm priceLabel={formatPrice(plan.amountCents, plan.currency)} />}>
+            <StartHandoff priceLabel={formatPrice(plan.amountCents, plan.currency)} />
+          </Suspense>
         </section>
       </div>
 

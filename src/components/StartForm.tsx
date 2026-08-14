@@ -6,16 +6,37 @@ import ExpectingChoice, { type Expecting } from "./ExpectingChoice";
 import MultiplesChoice from "./MultiplesChoice";
 import { FUNNEL } from "@/lib/funnel";
 
-export default function StartForm({ priceLabel }: { priceLabel: string }) {
+/// What somebody arrived carrying.
+///
+/// Set only by the handoff from `/check` — they typed a whole name into the
+/// free checker and pressed the button. The surname fills the field they can
+/// see and edit; the first and middle names have no field here, so they are
+/// named in a line above the form rather than travelling silently. A name
+/// appearing on a shortlist that nobody remembers typing into *this* form is
+/// a nice surprise exactly once and unsettling after that.
+export type StartPrefill = {
+  lastName?: string;
+  seedName?: { firstName: string; middleName?: string };
+};
+
+export default function StartForm({
+  priceLabel,
+  prefill,
+}: {
+  priceLabel: string;
+  prefill?: StartPrefill;
+}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const seed = prefill?.seedName;
+  const seedLabel = seed ? [seed.firstName, seed.middleName].filter(Boolean).join(" ") : "";
   const [form, setForm] = useState({
     you: "",
     youEmail: "",
     partner: "",
     partnerEmail: "",
     babyLabel: "",
-    lastName: "",
+    lastName: prefill?.lastName ?? "",
   });
   const [babyCount, setBabyCount] = useState(1);
   const [expecting, setExpecting] = useState<Expecting | "">("");
@@ -40,7 +61,9 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
     // never got past the two checks above isn't an attempt to buy, it's a
     // half-filled form. Counting those would make the drop-off to step three
     // look like a payment problem when it was a typo.
-    track(FUNNEL.startSubmit, { tier: "trial", babyCount });
+    // `fromCheck` rather than the name itself, so the two halves of the funnel
+    // can be told apart without a single event carrying what somebody typed.
+    track(FUNNEL.startSubmit, { tier: "trial", babyCount, fromCheck: Boolean(seed) });
     try {
       // No longer straight to Checkout. This mints a free grant and hands back
       // the link that opens it — the same shape the paid path always had, and
@@ -57,6 +80,7 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
             lastName: form.lastName.trim(),
             babyCount,
             expecting: expecting || undefined,
+            seedName: seed,
           },
         }),
       });
@@ -71,6 +95,16 @@ export default function StartForm({ priceLabel }: { priceLabel: string }) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {/* Copy is mine and provisional — Marzipan's deck covers the /check side
+          of this handoff but not the landing on this one. The requirement it
+          has to keep meeting: say the name out loud here, because it is about
+          to appear on a shortlist and this form never asked for it. */}
+      {seedLabel && (
+        <p className="rounded-xl bg-butter-soft/70 px-3.5 py-2.5 text-sm leading-relaxed text-sage-deep">
+          <span className="font-semibold">{seedLabel}</span> will be on your shortlist when the
+          journey opens.
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Your first name" value={form.you} onChange={(v) => set("you", v)} placeholder="Alex" />
         <Field

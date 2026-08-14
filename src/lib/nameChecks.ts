@@ -14,17 +14,44 @@ export type NameCheck = {
 };
 
 // Short letter-combos that tend to invite teasing on a monogram / initials.
+//
+// **The two-letter entries are the expensive ones, and they are not symmetric
+// with the list below.** With no middle name a monogram *is* two letters and
+// the surname supplies one of them — so a two-letter entry fires on the first
+// initial alone, at `watch`, which outranks everything and is therefore the
+// whole of what we say to that family. Every `DELIGHTFUL` entry is three
+// letters, so a two-letter monogram can only ever be bad news. Anything added
+// here at length two is a claim about a single letter against a surname, made
+// on the loudest tier we have.
+//
+// `CS` was here and is gone: nobody could name what is unfortunate about it,
+// and it was the most expensive entry in the list. Smith is the most common
+// surname in the United States, so every Charlotte, Caleb and Colin Smith had
+// a red-tier warning as their entire result.
 const UNFORTUNATE_INITIALS = new Set([
-  "ASS", "ASH", "BJ", "BM", "BO", "BS", "BUM", "CS", "DIE", "DUI", "FU", "FML",
+  "ASS", "BJ", "BM", "BO", "BS", "BUM", "DIE", "DUI", "FU", "FML",
   "GAS", "HIV", "KKK", "LSD", "OMG", "PMS", "POO", "POS", "PEE", "RAT", "SOB",
   "SOS", "STD", "SUX", "UGH", "VD", "WTF", "ZIT", "DUD", "HAG", "PIG", "GIT",
 ]);
 
 // Short combos that happen to spell something lovely.
+//
+// `ASH` moved here from the list above, where it was telling an Amara Sofia
+// Hughes family that their monogram was a thing to soften. It is a tree and a
+// name and it sits beside IVY and FOX without argument. The reading that put
+// it in the other list is the crematorium one, which takes some reaching for
+// and which nobody meeting a child called Ash has got to first.
 const DELIGHTFUL_INITIALS = new Set([
-  "ACE", "ART", "FAB", "JOY", "POP", "SKY", "WOW", "ELF", "GEM", "SUN", "OWL",
+  "ACE", "ART", "ASH", "FAB", "JOY", "POP", "SKY", "WOW", "ELF", "GEM", "SUN", "OWL",
   "CAT", "FOX", "IVY", "ZEN", "WIN", "TOP", "HUG", "AMP", "KEY", "MAP",
 ]);
+
+/// "Spell" is a claim that the letters make a word. Two letters do not spell
+/// BS, they read as it — and with no middle name two letters is the ordinary
+/// monogram rather than the edge case, so this is the wording most people get.
+function spellOrRead(initials: string) {
+  return initials.length >= 3 ? "spell" : "read";
+}
 
 function cap(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
@@ -72,6 +99,14 @@ function initialSound(name: string): string {
   return s[0];
 }
 
+/// The one check here that is an instruction rather than a finding.
+///
+/// Exported because `/check` renders its own copy in place of this line and
+/// has to be able to tell it apart from the real findings. Matching on the
+/// sentence would mean a reword put a form instruction back into a findings
+/// list, silently, on the page a stranger judges us by.
+export const NEEDS_SURNAME = "Add your surname for the full picture";
+
 export type NamePieces = {
   firstName: string;
   middleName?: string | null;
@@ -79,9 +114,14 @@ export type NamePieces = {
 };
 
 /// A name already chosen for one of the other babies in this journey, and what
-/// that baby is called while we wait for it. Only ever set for twins and
-/// triplets — a single baby has nobody to be compared with.
-export type Sibling = NamePieces & { label: string };
+/// that baby is called while we wait for it. In a workspace this is only ever
+/// set for twins and triplets — a single baby has nobody to be compared with.
+///
+/// `label` is null when the caller genuinely doesn't know who the other name
+/// belongs to. `/check` has two boxes and no relationship between them, and a
+/// free page inventing one — "that's their brother's name" — states a fact
+/// nobody gave us.
+export type Sibling = NamePieces & { label: string | null };
 
 export function analyzeName(
   { firstName, middleName, lastName }: NamePieces,
@@ -102,13 +142,13 @@ export function analyzeName(
     if (UNFORTUNATE_INITIALS.has(initials)) {
       checks.push({
         level: "watch",
-        title: `The initials spell "${initials}"`,
+        title: `The initials ${spellOrRead(initials)} "${initials}"`,
         detail: `Written out — on a backpack, a monogrammed towel, a school locker — the initials read ${initials}. Some parents nudge the middle name to soften this; others don't mind at all.`,
       });
     } else if (DELIGHTFUL_INITIALS.has(initials)) {
       checks.push({
         level: "delight",
-        title: `The initials spell "${cap(initials)}"`,
+        title: `The initials ${spellOrRead(initials)} "${cap(initials)}"`,
         detail: `A little hidden gift: the monogram reads ${cap(initials)}. Lovely on a keepsake.`,
       });
     }
@@ -120,7 +160,7 @@ export function analyzeName(
   if (!last) {
     checks.push({
       level: "info",
-      title: "Add your surname for the full picture",
+      title: NEEDS_SURNAME,
       detail: "Set your family surname in the workspace and I'll also check how the whole name flows and what it monograms to.",
     });
     return [...checks, ...siblingChecks({ firstName: first, middleName: middle }, siblings)];
@@ -273,12 +313,26 @@ function siblingChecks(name: NamePieces, siblings: Sibling[]): NameCheck[] {
     const pair = `${other} and ${first}`;
 
     if (a === b) {
-      checks.push({
-        pair: true,
-        level: "watch",
-        title: `That's ${sib.label}'s name`,
-        detail: `${sib.label} is already ${other}. Two children with one name between them is a lot to carry — unless you mean it as a middle name for both.`,
-      });
+      // The one branch that has to name the sibling, and so the one branch
+      // that changes when we don't know who they are. In a workspace the two
+      // names were entered against two babies, so this is a decision; on a
+      // free page with two boxes it is nine times in ten a slip, and the
+      // in-product sentence would be asserting a choice nobody made.
+      checks.push(
+        sib.label
+          ? {
+              pair: true,
+              level: "watch",
+              title: `That's ${sib.label}'s name`,
+              detail: `${sib.label} is already ${other}. Two children with one name between them is a lot to carry — unless you mean it as a middle name for both.`,
+            }
+          : {
+              pair: true,
+              level: "watch",
+              title: "That's the same name in both boxes",
+              detail: `Probably a slip — but if you meant it, two children with one name between them is a lot to carry, unless it's a middle name for both.`,
+            },
+      );
       continue;
     }
 

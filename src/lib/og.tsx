@@ -16,6 +16,19 @@ import { join } from "node:path";
 export const OG_SIZE = { width: 1200, height: 630 };
 export const OG_CONTENT_TYPE = "image/png";
 
+/// The vertical one, for a person saving their own result.
+///
+/// 2:3 because that is what Pinterest lays out on; 1000×1500 because it is the
+/// size their own guidance names and it is comfortably above the ~600px floor
+/// under which the Save button ignores an image altogether.
+///
+/// Worth being precise about what this is *not*, because we got it wrong once
+/// in this thread: it is not a social card. Pinterest's Save button pins an
+/// image that is **on the page** — an `og:image` that only exists in `<head>`
+/// is invisible to it. So this has to be rendered into the document, not just
+/// pointed at from metadata, or it produces nothing on either path.
+export const PIN_SIZE = { width: 1000, height: 1500 };
+
 // Tokens, copied rather than imported: globals.css is a stylesheet the image
 // renderer can't read, and these five values are the whole palette.
 const PAPER = "#f5f2e9";
@@ -161,6 +174,180 @@ export function OgCard({
         >
           {line}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------- the one somebody saves */
+
+/// How large the name can be set before it stops fitting.
+///
+/// The renderer lays this out in a fixed box and does **not** shrink to fit —
+/// an overflowing title doesn't fail a build, it slides under the rule below
+/// it and ships. `OgCard` solves that by making the caller pass `titleSize`
+/// and eyeball the PNG; this card can't, because nobody sees it before it is
+/// generated. So the size is derived from the length instead, with the steps
+/// chosen against the longest real names on the SSA list set in Cormorant at
+/// 840px of usable width.
+function nameSize(name: string): number {
+  if (name.length <= 16) return 112;
+  if (name.length <= 24) return 92;
+  if (name.length <= 34) return 74;
+  return 58;
+}
+
+/// How many findings fit before the card stops being a card.
+const MAX_LINES = 4;
+
+/// The result card: one name, its monogram, and what we found.
+///
+/// The empty state is the one most people get — roughly seven cards in ten come
+/// back with nothing — so it is the version that has to look best, and the
+/// findings list is the variant.
+///
+/// It used to fill that slot with "Nothing to flag." set large, and that was
+/// wrong twice over. It is the same sentence `analyzeName` was cleared of in
+/// be1150b — an absence of a finding is not a finding — reintroduced one level
+/// up, on the surface with the widest reach in the product. And it is not a
+/// thing anybody saves: the card is the Pinterest asset, its whole job is to be
+/// worth pinning, and on seven cards in ten it would have been three words
+/// saying we had nothing to say.
+///
+/// So the empty card carries no sentence at all. The name, the monogram and the
+/// closing rule are a name plate, which is a keepsake and is what people
+/// actually pin. The page keeps its "nothing to flag" headline and is right to:
+/// it has room for the two paragraphs that follow, and those paragraphs — the
+/// harder questions a checker can't answer — are the argument. The card gets
+/// neither the room nor the argument, so it should not borrow the reassurance
+/// they pay for.
+export function PinCard({
+  name,
+  initials,
+  findings,
+  foot,
+}: {
+  name: string;
+  initials: string;
+  /// Check titles only, in the order `analyzeName` produced them. Never the
+  /// detail sentences: they carry the name inline and run to three lines each,
+  /// which is a paragraph, which is not a thing anybody saves.
+  findings: string[];
+  foot: string;
+}) {
+  const shown = findings.slice(0, MAX_LINES);
+  const hidden = findings.length - shown.length;
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: PAPER,
+        padding: 44,
+        fontFamily: "Jost",
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          border: `1px solid ${LINE}`,
+          padding: "72px 80px",
+        }}
+      >
+        <Duck size={116} />
+
+        <div
+          style={{
+            marginTop: 56,
+            fontFamily: "Cormorant Garamond",
+            fontSize: nameSize(name),
+            lineHeight: 1.06,
+            color: PEWTER,
+            textAlign: "center",
+          }}
+        >
+          {name}
+        </div>
+
+        {/* The monogram, set the way the site sets its small caps. Only ever
+            drawn when there are two initials to draw — a single letter is not
+            a monogram, it's the first letter of a first name. */}
+        {initials.length >= 2 && (
+          <div
+            style={{
+              marginTop: 34,
+              fontSize: 30,
+              fontWeight: 500,
+              letterSpacing: 12,
+              color: PEWTER_MUTE,
+            }}
+          >
+            {initials}
+          </div>
+        )}
+
+        <div
+          style={{ marginTop: 54, width: 120, height: 1, flexShrink: 0, backgroundColor: LINE }}
+        />
+
+        {shown.length === 0 ? null : (
+          <div
+            style={{
+              marginTop: 48,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
+            {/* Spacing by margin rather than `gap`: Satori's flex support is a
+                subset, and a property it silently ignores here would show up
+                as a cramped card in somebody's feed rather than as an error. */}
+            {shown.map((line, i) => (
+              <div
+                key={line}
+                style={{
+                  marginTop: i === 0 ? 0 : 22,
+                  fontSize: 34,
+                  lineHeight: 1.3,
+                  color: SAGE_DEEP,
+                  textAlign: "center",
+                  maxWidth: 700,
+                }}
+              >
+                {line}
+              </div>
+            ))}
+            {/* Never a silent truncation. A card that quietly showed four of
+                six findings would read as "these are the findings". */}
+            {hidden > 0 && (
+              <div style={{ marginTop: 22, fontSize: 26, color: PEWTER_LIGHT }}>
+                and {hidden} more on the page
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          marginTop: 26,
+          fontSize: 24,
+          letterSpacing: 2.4,
+          color: PEWTER_LIGHT,
+          textTransform: "uppercase",
+        }}
+      >
+        {foot}
       </div>
     </div>
   );

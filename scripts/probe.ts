@@ -32,6 +32,9 @@ import { FUNNEL } from "../src/lib/funnel";
 import { FREE_TURNS } from "../src/lib/trial";
 import { TIERS } from "../src/lib/pricing";
 import { analyzeName, checkHeadline } from "../src/lib/nameChecks";
+import { PinCard } from "../src/lib/og";
+import { cleanNamePart, NAME_MAX } from "../src/lib/nameInput";
+import { cleanCheckInput, runCheck } from "../src/lib/checkPage";
 import { readFileSync } from "node:fs";
 
 let passed = 0;
@@ -390,6 +393,38 @@ function probeNameChecks() {
     say("Hannah", "Osei").every((c) => !c.detail.includes("*")),
   );
 
+  // --- The initials list, after Marzipan's audit.
+  check(
+    "CS is no longer a warning — it was every Charlotte and Caleb Smith's whole result",
+    titles("Charlotte", "Smith").length === 0,
+    titles("Charlotte", "Smith").join(" | "),
+  );
+  check("but BS still is, and it is true", titles("Brianna", "Smith").some((t) => t.includes('"BS"')));
+  check(
+    "ASH is a name, not a warning",
+    say("Amara", "Hughes", "Sofia").some((c) => c.level === "delight" && c.title.includes('"Ash"')),
+    titles("Amara", "Hughes", "Sofia").join(" | "),
+  );
+  // Two letters are read, not spelled. With no middle name two letters is the
+  // ordinary monogram, so this is the wording most people get.
+  check("two initials are read", titles("Brianna", "Smith").some((t) => t.startsWith("The initials read ")));
+  check(
+    "three initials are spelled",
+    titles("Adam", "Sutton", "Sam").some((t) => t.startsWith("The initials spell ")),
+  );
+
+  // --- A sibling we know, and a sibling we don't.
+  const sameName = (label: string | null) =>
+    analyzeName({ firstName: "Emma", middleName: "", lastName: "Ellis" }, [
+      { label, firstName: "Emma", middleName: "", lastName: "Ellis" },
+    ]).map((c) => c.title);
+  check("a workspace names the other baby", sameName("their brother").includes("That's their brother's name"));
+  check(
+    "a page with two boxes and no relationship does not invent one",
+    sameName(null).includes("That's the same name in both boxes"),
+    sameName(null).join(" | "),
+  );
+
   // --- One headline rule, not two.
   check("the headline prefers a watch over everything", checkHeadline(say("Bella", "Ella"))?.level === "watch");
   check(
@@ -411,6 +446,269 @@ function probeNameChecks() {
     "NameCard uses checkHeadline instead of reimplementing it",
     card.includes("checkHeadline(name.checks)") && !card.includes('c.level === "watch"'),
   );
+}
+
+
+/* ------------------------------------------------- what the share card says */
+
+/// Every string the card would draw, in the order it draws them.
+///
+/// Walked out of the element tree rather than grepped out of the source,
+/// because the thing being guarded is a *rendered* sentence: a grep can't tell
+/// a card from the comment above it, and the comment above it is about a
+/// sentence we deliberately no longer draw. `PinCard` is called rather than
+/// written as `<PinCard/>`, which would be an element nobody has rendered yet.
+function cardText(node: unknown): string[] {
+  if (node === null || node === undefined || typeof node === "boolean") return [];
+  if (typeof node === "string" || typeof node === "number") return [String(node)];
+  if (Array.isArray(node)) return node.flatMap(cardText);
+  const el = node as { props?: { children?: unknown } };
+  return el.props ? cardText(el.props.children) : [];
+}
+
+/// The reassurance came back once already.
+///
+/// `analyzeName` was cleared of three branches whose job was to report an
+/// absence, and then the card grew a fourth — "Nothing to flag." set large, in
+/// a different file, on the surface with the widest reach in the product. It
+/// passed every check above, because every check above is about `nameChecks`.
+///
+/// So this asserts the rule where it kept failing, one level up: the card that
+/// found nothing draws the name and nothing else.
+function probePinCard() {
+  section("The share card, when there is nothing to say");
+
+  const FOOT = "namesake.alora.tech/check";
+  const empty = cardText(
+    PinCard({ name: "Michael James Whitfield", initials: "MJW", findings: [], foot: FOOT }),
+  );
+
+  check(
+    "a card with no findings draws the name, the monogram and the footer — and nothing else",
+    empty.join(" | ") === `Michael James Whitfield | MJW | ${FOOT}`,
+    empty.join(" | "),
+  );
+  check(
+    "so it says nothing about having found nothing",
+    !empty.some((s) => /nothing/i.test(s)),
+    empty.join(" | "),
+  );
+
+  // The other half, which would break if someone "fixed" the above by taking
+  // the findings with it.
+  const full = cardText(
+    PinCard({
+      name: "Hannah Rose Osei",
+      initials: "HRO",
+      findings: ["Nothing between the names"],
+      foot: FOOT,
+    }),
+  );
+  check(
+    "a card with a finding still draws it",
+    full.includes("Nothing between the names"),
+    full.join(" | "),
+  );
+
+  // A real finding is allowed to contain the word — `analyzeName` owns its own
+  // copy and the check above must not become a ban on it. This is the seam:
+  // the rule is about the *slot*, not the vocabulary.
+  check(
+    "and a finding that happens to say 'nothing' is not mistaken for the empty state",
+    full.length === 4,
+    String(full.length),
+  );
+
+  // Never a silent truncation — five findings must say so rather than show four.
+  const many = cardText(
+    PinCard({ name: "Alexandria Josephine Fotopoulos", initials: "AJF", findings: ["a", "b", "c", "d", "e"], foot: FOOT }),
+  );
+  // Joined, not per-string: `and {hidden} more on the page` is three text
+  // nodes, and asserting against one of them tests JSX rather than the card.
+  check("five findings are not quietly shown as four", many.join("").includes("and 1 more on the page"), many.join(""));
+}
+
+/* ------------------------------------------------------ the free check page */
+
+/// Pure, so it runs everywhere. The HTTP half is in `probeCheckSurfaces`.
+function probeCheckPageLogic() {
+  section("The free /check page");
+
+  // --- What may be treated as a name.
+  check("a name survives intact", cleanNamePart("Siobhán O'Brien-Ng") === "Siobhán O'Brien-Ng");
+  check("markup does not", !cleanNamePart("<script>x</script>Emma").includes("<"));
+  check("nor do digits or emoji", cleanNamePart("Emma2 🎉") === "Emma");
+  check("nor a newline", cleanNamePart("Emma\nRose") === "Emma Rose");
+  check("a bidi override is gone", !cleanNamePart("Emma‮Rose").includes("‮"));
+  check("length is bounded", cleanNamePart("E".repeat(500)).length === NAME_MAX);
+  check("punctuation alone is not a name", cleanNamePart(" -. ") === "");
+  check("and neither is nothing", cleanNamePart(null) === "");
+
+  // --- The page and the card ask the same question of the same input.
+  const cleaned = cleanCheckInput({ first: " eleanor ", middle: "Rose", last: "Whitfield!", sibling: "" });
+  check("the input is cleaned once, in one place", cleaned.first === "eleanor" && cleaned.last === "Whitfield");
+
+  const eleanor = runCheck(cleanCheckInput({ first: "Eleanor", middle: "Rose", last: "Whitfield" }));
+  check("the full name is what would be written out", eleanor.fullName === "Eleanor Rose Whitfield");
+  check("the monogram is the initials", eleanor.initials === "ERW");
+  // Not the empty state, and this is worth pinning: the copy deck uses
+  // "Eleanor Rose Whitfield" to illustrate *nothing found*, but Eleanor ends
+  // on R and Rose begins on one, so the middle-name join fires. Three names in
+  // four are empty; this particular three are not.
+  check(
+    "the deck's own example is a findings card, not an empty one",
+    eleanor.findings.some((c) => c.title === "The middle name runs into its neighbour"),
+    eleanor.findings.map((c) => c.title).join(" | "),
+  );
+  const quiet = runCheck(cleanCheckInput({ first: "Charlotte", middle: "", last: "Smith" }));
+  check("and the empty state — what most people get — really is empty", quiet.findings.length === 0,
+    quiet.findings.map((c) => c.title).join(" | "));
+
+  // --- The surname prompt is an instruction, not a finding.
+  const partial = runCheck(cleanCheckInput({ first: "Eleanor", middle: "", last: "", sibling: "" }));
+  check("with no surname the page is in its partial state", partial.needsSurname);
+  check(
+    "and the 'add your surname' line is not counted as a finding",
+    partial.findings.every((c) => !c.title.startsWith("Add your surname")),
+    partial.findings.map((c) => c.title).join(" | "),
+  );
+  check("a single initial is not a monogram", partial.initials === "");
+
+  // --- A real finding still reaches the page.
+  const fused = runCheck(cleanCheckInput({ first: "Hannah", middle: "", last: "Osei", sibling: "" }));
+  check("a schwa meeting a vowel is a finding", fused.findings.some((c) => c.title === "Nothing between the names"));
+
+  // --- The sibling field, which is the differentiated half.
+  const pair = runCheck(cleanCheckInput({ first: "Arthur", middle: "", last: "Whitfield", sibling: "Arthur" }));
+  check(
+    "two identical names read as a slip, not as a decision nobody made",
+    pair.findings.some((c) => c.title === "That's the same name in both boxes"),
+    pair.findings.map((c) => c.title).join(" | "),
+  );
+
+  // --- The handoff carries a name onto the shortlist.
+  const seeded = journeyDraft.parse({
+    you: { name: "Alex", email: "probe-seed@example.com" },
+    partner: {},
+    lastName: "Whitfield",
+    seedName: { firstName: "Eleanor", middleName: "Rose" },
+  });
+  check("the draft carries a seed name", seeded.seedName?.firstName === "Eleanor");
+  // A hand-crafted URL must never be able to refuse somebody a signup: the
+  // seed is a nicety, so a malformed one is dropped rather than rejected.
+  const junk = journeyDraft.parse({
+    you: { name: "Alex", email: "probe-seed2@example.com" },
+    partner: {},
+    seedName: { firstName: "" },
+  });
+  check("a malformed seed is dropped, not fatal", junk.seedName === undefined);
+  // And every draft written before this field existed still parses.
+  check(
+    "an old draft with no seed still parses",
+    journeyDraft.parse({ you: { name: "Alex", email: "probe-seed3@example.com" }, partner: {} }).seedName ===
+      undefined,
+  );
+}
+
+/// The seeded name actually lands on the shortlist. Needs a database.
+async function probeSeededShortlist() {
+  section("The /check handoff, end to end");
+
+  const user = await db.user.create({
+    data: { email: `probe-seed-${Date.now()}@example.com`, name: "Alex" },
+  });
+  const draft = journeyDraft.parse({
+    you: { name: "Alex", email: `probe-seed-${Date.now()}@example.com` },
+    partner: {},
+    lastName: "Whitfield",
+    seedName: { firstName: "Eleanor", middleName: "Rose" },
+  });
+  const { workspace } = await createJourney(draft, user.id, { isTrial: true });
+
+  const names = await db.nameEntry.findMany({ where: { workspaceId: workspace.id } });
+  check("the journey opens with exactly one name on it", names.length === 1, String(names.length));
+  check("it is the name they checked", names[0]?.firstName === "Eleanor" && names[0]?.middleName === "Rose");
+  check("shortlisted, not merely under consideration", names[0]?.status === "shortlist");
+  // Null, so it follows the family surname if they ever change it — the
+  // per-name override means "this one name against a different surname",
+  // which is not what happened here.
+  check("and it inherits the workspace surname rather than pinning one", names[0]?.lastName === null);
+  check("the surname came across too", workspace.lastName === "Whitfield");
+
+  const plainUser = await db.user.create({
+    data: { email: `probe-plain-${Date.now()}@example.com`, name: "Alex" },
+  });
+  const plain = await createJourney(
+    journeyDraft.parse({ you: { name: "Alex", email: `probe-plain-${Date.now()}@example.com` }, partner: {} }),
+    plainUser.id,
+    { isTrial: true },
+  );
+  check(
+    "a journey started without the handoff is still empty",
+    (await db.nameEntry.count({ where: { workspaceId: plain.workspace.id } })) === 0,
+  );
+}
+
+/// robots.txt, sitemap.xml, the page and the card, as served.
+async function probeCheckSurfaces() {
+  section("Tier 0 — what a crawler and a visitor actually get");
+
+  const origin = process.env.PROBE_ORIGIN;
+  if (!origin) {
+    console.log("  skip  no PROBE_ORIGIN set — these are HTTP surfaces");
+    return;
+  }
+
+  const robots = await fetch(`${origin}/robots.txt`);
+  const robotsText = await robots.text();
+  check("robots.txt is served at all — it was a 404", robots.status === 200, String(robots.status));
+  check("it points at the sitemap", robotsText.includes("/sitemap.xml"));
+  // The private rooms. Unguessable is not unlisted.
+  for (const path of ["/w/", "/s/", "/join/", "/redeem/", "/auth/", "/api/", "/admin", "/check/card"]) {
+    check(`it keeps crawlers out of ${path}`, robotsText.includes(`Disallow: ${path}`), robotsText);
+  }
+
+  const sitemap = await fetch(`${origin}/sitemap.xml`);
+  const sitemapText = await sitemap.text();
+  check("sitemap.xml is served — it was a 404 too", sitemap.status === 200, String(sitemap.status));
+  check("the free page is in it", sitemapText.includes("/check<"));
+  // The failure this guards is the quiet one: unset, the origin falls back to
+  // localhost and the sitemap builds, validates, and is fiction. Skipped when
+  // the probe is itself pointed at localhost, where it is the truth.
+  if (!origin.includes("localhost") && !origin.includes("127.0.0.1")) {
+    check("and no localhost URL was published as fact", !sitemapText.includes("localhost"), sitemapText.slice(0, 200));
+  }
+  for (const secret of ["/w/", "/join/", "/redeem/", "/journeys"]) {
+    check(`no private path leaked into it: ${secret}`, !sitemapText.includes(secret));
+  }
+
+  const page = await fetch(`${origin}/check`);
+  const html = await page.text();
+  check("/check is served", page.status === 200, String(page.status));
+  check("the privacy line is on it", html.includes("save what you type here"));
+  check(
+    "and it is reachable from the storefront",
+    (await fetch(origin).then((r) => r.text())).includes('href="/check"'),
+  );
+
+  const card = await fetch(`${origin}/check/card?first=Eleanor&middle=Rose&last=Whitfield`);
+  check("the share card renders", card.status === 200, String(card.status));
+  check(
+    "as a PNG",
+    card.headers.get("content-type")?.includes("image/png") === true,
+    String(card.headers.get("content-type")),
+  );
+  // Two layers, because they fail differently: robots stops the fetch, the
+  // header stops the keep.
+  check(
+    "and it is noindex, so an indexed one can't become a page of ours about a stranger's child",
+    card.headers.get("x-robots-tag")?.includes("noindex") === true,
+    String(card.headers.get("x-robots-tag")),
+  );
+  const bare = await fetch(`${origin}/check/card`);
+  check("a card with no name is refused rather than drawn", bare.status === 400, String(bare.status));
+  const junkCard = await fetch(`${origin}/check/card?first=${encodeURIComponent("123 🎉")}`);
+  check("and so is one whose name is not a name", junkCard.status === 400, String(junkCard.status));
 }
 
 /* ----------------------------------------------------------- the free tier */
@@ -896,7 +1194,11 @@ async function main() {
   probeDueDate();
   probeFunnelNames();
   probeNameChecks();
+  probePinCard();
+  probeCheckPageLogic();
   await probeIndexes();
+  await probeSeededShortlist();
+  await probeCheckSurfaces();
   const workspaceId = await probeWorkspaceState();
   await probeSuggestLimits(workspaceId);
   await probeFreeTier();
