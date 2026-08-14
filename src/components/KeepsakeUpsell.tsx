@@ -2,12 +2,17 @@
 
 import { useEffect, useState } from "react";
 import type { WorkspaceState } from "@/lib/workspace";
-import { ADD_ONS, formatPrice, type AddOnId } from "@/lib/pricing";
+import { ADD_ONS, ADD_ONS_FOR_SALE, formatPrice, type AddOnId } from "@/lib/pricing";
 
 // The keepsakes offered at the decision moment, in the order they're shown.
 // Each is made-to-order with the chosen name, so they only appear here — once
 // there's actually a name to put on them.
-const KEEPSAKES: AddOnId[] = ["framed_print", "blanket", "keepsake_set"];
+//
+// Currently empty, because nothing physical is on sale, and this whole section
+// disappears rather than offering something nobody can make. It is the riskiest
+// place in the product to sell an obligation: it fires at the moment a paying
+// customer likes us most.
+const KEEPSAKES: AddOnId[] = ADD_ONS_FOR_SALE;
 
 export default function KeepsakeUpsell({ ws }: { ws: WorkspaceState }) {
   // key = `${slot}::${addOn}` — one selection per baby per keepsake.
@@ -75,6 +80,10 @@ export default function KeepsakeUpsell({ ws }: { ws: WorkspaceState }) {
       </div>
     );
   }
+
+  // After the thank-you, so anyone returning from an order placed before this
+  // shipped still sees it confirmed rather than nothing at all.
+  if (KEEPSAKES.length === 0) return null;
 
   return (
     <section className="mx-auto w-full max-w-3xl px-5 pt-5">

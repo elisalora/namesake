@@ -209,18 +209,33 @@ Everything is paid for once. Nothing auto-renews, so there's nothing to cancel a
 way to quietly bill a family after the naming is over.
 
 Two audiences: **the gifter buys, the couple uses.** The ladder is built around that,
-anchored on Bloom — the boxed tier meant to be handed over at a shower.
+anchored on The Gift — the tier meant to be handed over at a shower.
 
 | Tier | Who buys | Lasts | Arrives | Price |
 |---|---|---|---|---|
 | **Sprout** | a gifter | 1 month | by email | $10 |
-| **Bloom** ★ | a gifter | 3 months | in a box | $65 |
-| **The Whole Journey** | a gifter | until the due date + 7 days | by email | $50 |
+| **The Gift** ★ | a gifter | 3 months | by email | $39 |
+| **The Whole Journey** | a gifter | until the due date + 7 days | by email | $59 |
 | A journey of your own | a parent | 3 months | by email | $20 |
 | *One week past due?* | a member | +1 month | — | $19 |
 
-Add-ons ride along on any gift and are made once there's a name to put on them:
-embroidered blanket $75, framed keepsake $30, or both as the keepsake set $95.
+**Nothing ships.** The boxed tier and the three physical add-ons — embroidered blanket
+$75, framed keepsake $30, keepsake set $95 — are withdrawn: each was made and posted by
+hand by one person, so every sale was an obligation rather than income. They stay in
+`ADD_ONS` as the catalog of record, and `ADD_ONS_FOR_SALE` is the empty list that keeps
+them off every storefront and out of both checkout routes. One line to reverse the day
+somebody other than the founder can make them.
+
+The gift card itself already exists — `/admin/orders/[id]/card` renders the buyer's note,
+a QR to the redeem link and a second QR for the gift table — but it is admin-only, printed
+at packing time. Until a buyer can reach it, **the storefront says nothing about a card to
+print.** Selling a hand-over moment we don't hand over is the same defect as shipping a box
+nobody can pack.
+
+The featured tier used to invert the ladder — $65 for three months against $50 for up to
+nine, so a gifter comparing them side by side was argued down it. $39 against $59 reads
+the way a ladder should: more money buys more time.
+
 Every price is env-overridable — see `.env.example`.
 
 **The Whole Journey's window can't be known when it's bought.** A gifter rarely knows the
@@ -284,7 +299,7 @@ this. Gate it by setting `NAMESAKE_ADMIN_EMAILS`; empty means nobody.
 
 Every journey has a suggestion link that anyone can post a name into. `/w/[id]/shower`
 turns it into a QR with a print-ready card and table sign — the thing that goes on the
-gift table, and what the card in the Bloom box points at.
+gift table, and what the second QR on the printed gift card points at.
 
 It does three things at once: it spares the couple a day of opinions delivered in person,
 it activates the product at the moment everyone's paying attention, and every guest who

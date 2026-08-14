@@ -3,7 +3,7 @@ import { z } from "zod";
 import { originFrom, getCurrentUser } from "@/lib/auth";
 import { getMemberForWorkspace } from "@/lib/session";
 import { createKeepsakeOrder, startCheckout } from "@/lib/purchase";
-import { isAddOnId, type AddOnId } from "@/lib/pricing";
+import { isAddOnForSale, type AddOnId } from "@/lib/pricing";
 import { getWorkspaceState } from "@/lib/workspace";
 
 // Ordering a personalized keepsake after the name is chosen. Each line is an
@@ -15,7 +15,7 @@ const schema = z.object({
   lines: z
     .array(
       z.object({
-        addOn: z.string().refine(isAddOnId, "We don't offer that keepsake."),
+        addOn: z.string().refine(isAddOnForSale, "We don't offer that keepsake."),
         slot: z.number().int().min(0).max(5).nullable().optional(),
       }),
     )

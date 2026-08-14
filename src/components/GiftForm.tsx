@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 
+// Nothing on the storefront ships any more, so this view has no `physical` and
+// no box contents. Both came back out of the form rather than sitting here as
+// branches that can never be true — if something physical ever returns, it
+// returns deliberately.
 type TierView = {
   id: string;
   name: string;
@@ -9,8 +13,6 @@ type TierView = {
   blurb: string;
   price: string;
   window: string;
-  physical: boolean;
-  boxContents: string[];
   featured: boolean;
 };
 
@@ -51,8 +53,8 @@ export default function GiftForm({
       setError("We need your name and email — so they know who it's from, and you get a receipt.");
       return;
     }
-    // A digital gift has no card to carry the link, so it has to be emailed.
-    if (!tier.physical && !form.recipientEmail.trim()) {
+    // Every gift is delivered by email, so we always need somewhere to send it.
+    if (!form.recipientEmail.trim()) {
       setError(`${tier.name} arrives by email, so we'll need their address.`);
       return;
     }
@@ -82,8 +84,8 @@ export default function GiftForm({
 
   return (
     <form onSubmit={submit}>
-      {/* Tiers. Bloom sits in the middle and is visually heaviest — it's the
-          one the ladder is built to sell. */}
+      {/* Tiers. The Gift sits in the middle and is visually heaviest — it's
+          the one the ladder is built to sell. */}
       <div className="grid gap-4 lg:grid-cols-3">
         {tiers.map((t) => {
           const selected = t.id === tierId;
@@ -111,31 +113,17 @@ export default function GiftForm({
               <p className="mt-3 text-sm leading-relaxed text-ink-soft">{t.blurb}</p>
 
               <div className="mt-4 border-t border-line pt-3 text-xs uppercase tracking-wide text-ink-soft">
-                {t.window}
-                {t.physical ? " · arrives in a box" : " · arrives by email"}
+                {t.window} · arrives by email
               </div>
-
-              {t.boxContents.length > 0 && (
-                <>
-                  <p className="engraved mt-4">In the box</p>
-                  <ul className="mt-2 space-y-1.5">
-                    {t.boxContents.map((c) => (
-                      <li key={c} className="flex gap-2 text-sm leading-relaxed text-ink-soft">
-                        <span aria-hidden className="text-sage-deep">
-                          ·
-                        </span>
-                        {c}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
             </button>
           );
         })}
       </div>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_0.9fr]">
+      <div
+        className={`mt-8 grid gap-8 ${addOns.length > 0 ? "lg:grid-cols-[1fr_0.9fr]" : "lg:mx-auto lg:max-w-xl"}`}
+      >
+        {addOns.length > 0 && (
         <section>
           <h2 className="font-display text-2xl text-ink">Add a keepsake</h2>
           <p className="mb-4 mt-1 text-sm leading-relaxed text-ink-soft">
@@ -176,13 +164,12 @@ export default function GiftForm({
             })}
           </div>
         </section>
+        )}
 
         <section className="rounded-3xl border border-line bg-card p-7 shadow-[0_20px_60px_-30px_rgba(65,74,69,0.4)]">
           <h2 className="font-display text-2xl text-ink">Send it</h2>
           <p className="mb-5 mt-1 text-sm leading-relaxed text-ink-soft">
-            {tier.physical
-              ? "The box comes to you, so you can give it in person. Add their email and they can start before it arrives."
-              : "This one goes straight to their inbox."}
+            This one goes straight to their inbox.
           </p>
 
           <div className="space-y-4">
@@ -205,7 +192,6 @@ export default function GiftForm({
 
             <Field
               label="Their email"
-              hint={tier.physical ? "optional — the card carries it too" : undefined}
               type="email"
               value={form.recipientEmail}
               onChange={(v) => set("recipientEmail", v)}
@@ -215,9 +201,7 @@ export default function GiftForm({
             <label className="block">
               <span className="mb-1 flex items-baseline gap-1.5 text-sm font-semibold text-ink">
                 A note
-                <span className="text-xs font-normal text-ink-soft">
-                  {tier.physical ? "goes on the card" : "optional"}
-                </span>
+                <span className="text-xs font-normal text-ink-soft">they read it first</span>
               </span>
               <textarea
                 value={form.giftMessage}
@@ -240,8 +224,7 @@ export default function GiftForm({
             {loading ? "Taking you to checkout…" : `Give ${tier.name}`}
           </button>
           <p className="mt-2 text-center text-xs leading-relaxed text-ink-soft">
-            Paid once — no subscription for them to cancel.
-            {tier.physical ? " We'll ask where to post it at checkout." : ""} Fully{" "}
+            Paid once — no subscription for them to cancel. Fully{" "}
             {/* A new tab, not a navigation. This form is half-filled by the
                 time anybody reads the small print — a tier chosen, a name
                 typed, sometimes an address — and sending them to a policy

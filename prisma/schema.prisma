@@ -86,7 +86,8 @@ model LoginToken {
 ///             up front and there is nothing to redeem
 model Purchase {
   id   String @id @default(cuid())
-  tier String // sprout | bloom | whole_journey | self_serve | extend
+  // Historical rows may still read `bloom`, the withdrawn boxed tier.
+  tier String // sprout | the_gift | whole_journey | self_serve | extend
   kind String // journey | gift | extend — how it's redeemed
 
   /// Where the *money* stands: pending | paid | redeemed | refunded | disputed.

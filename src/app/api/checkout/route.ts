@@ -5,12 +5,12 @@ import { originFrom, getCurrentUser } from "@/lib/auth";
 import { journeyDraft } from "@/lib/journey";
 import { getMemberForWorkspace } from "@/lib/session";
 import { createPurchase, createExtension, createUpgrade, startCheckout } from "@/lib/purchase";
-import { TIERS, isTierId, isAddOnId } from "@/lib/pricing";
+import { TIERS, isTierId, isAddOnForSale } from "@/lib/pricing";
 import { trackFunnel } from "@/lib/analytics";
 import { FUNNEL } from "@/lib/funnel";
 
 const addOns = z
-  .array(z.string().refine(isAddOnId, "Unknown add-on."))
+  .array(z.string().refine(isAddOnForSale, "That one isn't available."))
   .max(6)
   .optional();
 

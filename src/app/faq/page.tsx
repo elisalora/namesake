@@ -13,9 +13,9 @@ export const metadata = {
 // further down — someone paying to be advised should know what's advising them.
 export default function FaqPage() {
   // The range has to come from the catalog, not from two tiers picked by hand.
-  // Naming `sprout` and `whole_journey` quoted "$10 to $50" while Bloom — the
-  // featured tier, the one this page exists to justify — sat above the ceiling
-  // at $65. On a page whose whole argument is being straight about money, the
+  // Naming `sprout` and `whole_journey` by hand quoted a range that the
+  // featured tier — the one this page exists to justify — could sit outside
+  // of entirely. On a page whose whole argument is being straight about money, the
   // cheapest thing we sell to the dearest is the only defensible pair, and
   // every price here is env-overridable, so it has to be computed.
   const amounts = [...GIFT_TIERS, TIERS.self_serve].map((t) => t.amountCents);
