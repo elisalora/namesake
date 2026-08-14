@@ -18,9 +18,21 @@ import { siteUrl } from "@/lib/siteUrl";
 // **The names are bounded at the door**, by the same function the page uses.
 // See lib/nameInput.ts for what that bound honestly is and isn't.
 //
-// **It is `noindex`, and robots.ts disallows it.** An indexed one would be a
-// page of ours about a stranger's child. Two layers because they fail
-// differently: robots stops the fetch, the header stops the keep.
+// **It is `noindex`, and robots.ts deliberately does NOT disallow it.** An
+// indexed one would be a page of ours about a stranger's child, and the header
+// below is the whole of what prevents that. This comment used to claim the
+// Disallow was a second layer — "robots stops the fetch, the header stops the
+// keep" — which is exactly backwards and is the reason the line is gone.
+//
+// A `noindex` is only obeyed on a URL a crawler is allowed to fetch: refused
+// the request, it never reads the header. And a disallowed URL that Google
+// finds a link to can still be indexed *as a URL*, with no content. Here the
+// sensitive part IS the URL — the name is in the query string — so a Disallow
+// would hand over the one thing worth protecting and discard the only means of
+// retracting it.
+//
+// So: if you are about to re-add `/check/card` to robots.ts, this is the note
+// saying don't. `probe.ts` fails the build if you do.
 
 /// Nothing renders it, but a bare `/check/card` should be a refusal rather
 /// than a 500 out of the middle of the renderer.

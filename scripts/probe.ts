@@ -714,8 +714,8 @@ async function probeCheckSurfaces() {
     card.headers.get("content-type")?.includes("image/png") === true,
     String(card.headers.get("content-type")),
   );
-  // Two layers, because they fail differently: robots stops the fetch, the
-  // header stops the keep.
+  // Not a second layer behind a Disallow — the only layer, and the reason the
+  // Disallow had to go. See the check above and the note on the route.
   check(
     "and it is noindex, so an indexed one can't become a page of ours about a stranger's child",
     card.headers.get("x-robots-tag")?.includes("noindex") === true,

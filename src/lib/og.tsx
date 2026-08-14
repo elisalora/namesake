@@ -45,7 +45,27 @@ const SAGE_DEEP = "#55654f";
 /// deploy should not silently drop the brand faces and ship a card in the
 /// renderer's fallback sans, which is the one failure nobody would notice
 /// until it was in somebody's messages. Licences sit beside them.
-export async function ogFonts() {
+/// Held for the life of the process, not re-read per render.
+///
+/// The two OG routes are drawn once per share and this never mattered. The pin
+/// card is different: it is public, unauthenticated, and keyed on an arbitrary
+/// query string, so every distinct name is a fresh render — three file reads
+/// each, of three files that cannot change without a redeploy.
+///
+/// Deliberately not a rate limiter and not a defence. Nothing here stops
+/// somebody rendering ten thousand names; it just declines to do the same disk
+/// I/O ten thousand times while they do. The proportionate answer to the bill
+/// is a spend cap in the Vercel dashboard, which is not code.
+let fontsPromise: ReturnType<typeof loadFonts> | null = null;
+
+export function ogFonts() {
+  // The *promise* is cached rather than the result, so N concurrent first
+  // requests share one read instead of racing into three apiece.
+  fontsPromise ??= loadFonts();
+  return fontsPromise;
+}
+
+async function loadFonts() {
   const [display, sans, sansMedium] = await Promise.all([
     readFile(join(process.cwd(), "assets/CormorantGaramond-Medium.ttf")),
     readFile(join(process.cwd(), "assets/Jost-400.ttf")),
