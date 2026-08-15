@@ -48,7 +48,29 @@ function endRhyme(a: string, b: string): boolean {
   return false;
 }
 
-const VOWELS = new Set(["a", "e", "i", "o", "u", "y"]);
+// `VOWELS` used to live here, holding a, e, i, o, u *and y*, and it was the
+// whole of the flow rule's phonetics. Its last caller is gone. Anything that
+// wants to reason about a vowel now has to say which vowel and in what
+// position, because that turned out to be the entire question.
+
+/// The sound an initial letter makes, as far as spelling can honestly tell.
+///
+/// C and G are the two English initials that go two ways, and the rule for
+/// them is regular: soft before e, i and y. Cynthia opens on /s/ and Carter on
+/// /k/; George on /dʒ/ and Garcia on /g/. Every other letter is taken at face
+/// value.
+///
+/// This is a heuristic and not a pronunciation dictionary. It is here because
+/// the alliteration check is a *claim*, made in our own voice, on the line a
+/// stranger reads first — and against a surname like Garcia nearly half of the
+/// names it fired on did not alliterate at all. It fixes the two cases that
+/// regularly collide on a name card and claims nothing beyond them.
+function initialSound(name: string): string {
+  const s = name.toLowerCase();
+  if (s.startsWith("c")) return /^c[eiy]/.test(s) ? "s" : "k";
+  if (s.startsWith("g")) return /^g[eiy]/.test(s) ? "j" : "g";
+  return s[0];
+}
 
 export type NamePieces = {
   firstName: string;
@@ -89,13 +111,10 @@ export function analyzeName(
         title: `The initials spell "${cap(initials)}"`,
         detail: `A little hidden gift: the monogram reads ${cap(initials)}. Lovely on a keepsake.`,
       });
-    } else {
-      checks.push({
-        level: "info",
-        title: `Monogram: ${initials}`,
-        detail: `The initials read ${initials} — nothing awkward there.`,
-      });
     }
+    // No third branch on purpose. A monogram with nothing wrong with it is not
+    // a finding, and saying so out loud was the single most-read sentence in
+    // the product — see the note at the foot of this file.
   }
 
   if (!last) {
@@ -127,8 +146,11 @@ export function analyzeName(
     });
   }
 
-  // Alliteration is usually a plus.
-  if (first[0].toLowerCase() === lStart && fEnd !== lStart) {
+  // Alliteration is usually a plus. Compared on the sound the initial makes
+  // rather than the letter — "George Garcia" and "Cynthia Carter" match on
+  // paper and on nothing else, and this check is the one a stranger is most
+  // likely to see, so it is the one least able to afford being visibly wrong.
+  if (initialSound(first) === initialSound(last) && fEnd !== lStart) {
     checks.push({
       level: "delight",
       title: "Nice alliteration",
@@ -136,12 +158,35 @@ export function analyzeName(
     });
   }
 
-  // Trailing/leading vowel pileup (e.g. "Mia Ainsworth" → "Miaainsworth").
-  if (VOWELS.has(fEnd) && VOWELS.has(lStart)) {
+  // Two names with no consonant between them.
+  //
+  // English does not leave two vowels touching: it inserts a glide, and which
+  // glide is decided by how the first vowel ends. A front/high finish (-y, -i,
+  // -ie, -ee, -ey) takes a /j/ — "Emily Ellis" is *Emily-yellis*. A back or
+  // rounded one (-o, -u, -ew) takes a /w/ — "Theo Ellis" is *Theo-wellis*.
+  // Neither blurs. A final schwa is the case with no glide available, so -a
+  // and -ah are the only endings that actually fuse.
+  //
+  // That is why this reads the ending rather than asking `VOWELS`, and it
+  // fixes the rule in both directions: -ah names end on a schwa and are the
+  // strongest cases there are, and the old test was silent on all 67 of them
+  // because `h` is not a vowel letter. On the surname side `y` is excluded
+  // outright — y- is /j/, a consonant, and `VOWELS` containing "y" meant every
+  // Yamamoto and Young family got this line on half their shortlist.
+  //
+  // Known limit, not worth chasing: -ea is /i/ and does take a glide, so
+  // Chelsea, Lea and Shea are three false fires out of 455. (Andrea is a
+  // genuine schwa.)
+  const schwaEnding = /(a|ah)$/i.test(first);
+  if (schwaEnding && /^[aeiou]/i.test(last)) {
+    // Only illustrated for a plain -a, where eliding the vowel gives a word
+    // that is actually right. "Hannah" + "Osei" has no such clean form, and a
+    // made-up one would be the exact failure this check is being fixed for.
+    const fused = /a$/i.test(first) ? ` — *${first.slice(0, -1)}${last.toLowerCase()}*` : "";
     checks.push({
       level: "info",
-      title: "Vowels meet between the names",
-      detail: `"${first} ${last}" ends and begins on vowels, which can slur together. Often totally fine — just worth hearing out loud.`,
+      title: "Nothing between the names",
+      detail: `"${first} ${last}" ends on an open vowel and begins again on one, with no consonant in between. Said quickly it can land as a single word${fused}. Worth hearing someone else say it before you decide.`,
     });
   }
 
@@ -164,13 +209,9 @@ export function analyzeName(
         title: "The middle name runs into its neighbour",
         detail: `"${first} ${middle} ${last}" butts two matching sounds together. It usually smooths out in speech — say it once, quickly, and see.`,
       });
-    } else {
-      checks.push({
-        level: "delight",
-        title: `"${first} ${middle} ${last}" reads well`,
-        detail: `The three names sit apart cleanly — nothing collides, nothing chimes. The full name is the one on the certificate, so it's worth this much attention.`,
-      });
     }
+    // Again no third branch: three names that don't collide is the ordinary
+    // case, and it fired on 85% of full names.
   }
 
   // --- Full-name length ---
@@ -262,14 +303,8 @@ function siblingChecks(name: NamePieces, siblings: Sibling[]): NameCheck[] {
         title: `Both begin with ${a[0].toUpperCase()}`,
         detail: `${pair} share an initial. Plenty of families love a matched set; others find it a lifetime of opened post. Either is fine — as long as it's a choice.`,
       });
-    } else {
-      checks.push({
-        pair: true,
-        level: "info",
-        title: `Said together: ${pair}`,
-        detail: `Nothing awkward in the pair — different sounds, different shape. Say them out loud one after the other and see how they land.`,
-      });
     }
+    // And none here. A pair that sits fine together needs no sentence.
 
     // Independent of how they sound: two children who monogram to the same
     // three letters share every towel, satchel, and engraved cup they own.
@@ -289,10 +324,22 @@ function siblingChecks(name: NamePieces, siblings: Sibling[]): NameCheck[] {
 }
 
 // A single one-line headline for a name, for compact list views.
+//
+// The one place this rule is written down. It existed twice — here, and again
+// inside NameCard — with different fallbacks, and the copy nobody had chosen
+// was the one on screen. If a second caller ever needs a different rule, give
+// it an argument; do not write the `find` chain out again.
+//
+// The fallback is `checks[0]` rather than null on purpose. Every check this
+// function can now be handed is a finding — the three branches that fired to
+// say *nothing is wrong* are gone — so falling through to the first one shows
+// a true `info` line ("Two matching sounds meet in the middle", "A long full
+// name to write out") instead of dropping the whole tier off the card.
 export function checkHeadline(checks: NameCheck[]): NameCheck | null {
   return (
     checks.find((c) => c.level === "watch") ??
     checks.find((c) => c.level === "delight") ??
+    checks[0] ??
     null
   );
 }

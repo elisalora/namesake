@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import type { NameState } from "@/lib/workspace";
+// Safe from a client component: nameChecks.ts has no imports of its own, so
+// this pulls in one pure function and nothing behind it.
+import { checkHeadline } from "@/lib/nameChecks";
 import GenderMark, { nextGender } from "./GenderMark";
 import { slotLabel } from "@/lib/babies";
 
@@ -73,10 +76,7 @@ export default function NameCard({
   // Which baby this name belongs to, if it's been given to one.
   const isChosen = name.chosenSlot !== null;
 
-  const headline =
-    name.checks.find((c) => c.level === "watch") ??
-    name.checks.find((c) => c.level === "delight") ??
-    name.checks[0];
+  const headline = checkHeadline(name.checks);
 
   async function setScore(score: number) {
     setBusy(true);

@@ -31,6 +31,8 @@ import { db } from "../src/lib/db";
 import { FUNNEL } from "../src/lib/funnel";
 import { FREE_TURNS } from "../src/lib/trial";
 import { TIERS } from "../src/lib/pricing";
+import { analyzeName, checkHeadline } from "../src/lib/nameChecks";
+import { readFileSync } from "node:fs";
 
 let passed = 0;
 const failures: string[] = [];
@@ -303,6 +305,111 @@ function probeFunnelNames() {
   check(
     "and none of them is empty or whitespace",
     names.every((n) => typeof n === "string" && n.trim() === n && n.length > 0),
+  );
+}
+
+/* -------------------------------------------- what a name card actually says */
+
+/// These are cheap and pure, and they exist because the defect they cover was
+/// invisible to every reading of this file: three branches fired to announce
+/// that nothing was wrong, and one of them was the headline on 94% of cards.
+/// Counting is what found it, so counting is what guards it.
+function probeNameChecks() {
+  section("Name checks (finding 13)");
+
+  const say = (first: string, last: string, middle = "") =>
+    analyzeName({ firstName: first, middleName: middle, lastName: last });
+  const titles = (first: string, last: string, middle = "") =>
+    say(first, last, middle).map((c) => c.title);
+
+  // --- No check may exist whose job is to report an absence.
+  const REASSURANCE = ["nothing awkward there", "nothing collides, nothing chimes", "Nothing awkward in the pair"];
+  const source = readFileSync(new URL("../src/lib/nameChecks.ts", import.meta.url), "utf8");
+  for (const phrase of REASSURANCE) {
+    check(`no check says "${phrase}"`, !source.includes(phrase));
+  }
+
+  // The three surfaces those branches used to fire on, asserted through the
+  // function rather than the source — a phrase can be reworded, a branch
+  // returning has to be caught by what it returns.
+  check(
+    "an unremarkable monogram produces no line at all",
+    !titles("Emma", "Ellis", "Rose").some((t) => t.startsWith("Monogram:")),
+    titles("Emma", "Ellis", "Rose").join(" | "),
+  );
+  check(
+    "a full name that collides with nothing produces no line about the full name",
+    !titles("Emma", "Ellis", "Rose").some((t) => t.includes("reads well")),
+  );
+  check(
+    "a sibling pair that sits fine together produces no line",
+    !analyzeName({ firstName: "Emma", middleName: "", lastName: "Ellis" }, [
+      { label: "their brother", firstName: "Thomas", middleName: "", lastName: "Ellis" },
+    ]).some((c) => c.title.startsWith("Said together:")),
+  );
+
+  // --- But the real findings all survive. This is the half that would break
+  // if someone "cleaned up" the deletion by taking the branch above it too.
+  check("an unfortunate monogram is still called out", titles("Adam", "Sutton", "Sam").some((t) => t.includes('spell "ASS"')));
+  check("a delightful monogram is still called out", titles("Jonah", "Yardley", "Opal").some((t) => t.includes('spell "Joy"')));
+  check("a rhyme is still called out", titles("Bella", "Ella").some((t) => t.includes("rhyme")));
+  check("a run-on is still called out", titles("Thomas", "Smith").some((t) => t.includes("Two matching sounds")));
+  check("a long full name is still called out", titles("Alexandria", "Fotopoulos", "Josephine").some((t) => t.includes("A long full name")));
+  check(
+    "a missing surname still asks for one",
+    titles("Emma", "").some((t) => t.includes("Add your surname")),
+  );
+
+  // --- Alliteration compares sounds, not letters.
+  check("hard C alliterates with hard C", titles("Carter", "Cole").includes("Nice alliteration"));
+  check("soft C does not alliterate with hard C", !titles("Cynthia", "Carter").includes("Nice alliteration"));
+  check("soft G does not alliterate with hard G", !titles("George", "Garcia").includes("Nice alliteration"));
+  check("hard G still alliterates with hard G", titles("Grace", "Garcia").includes("Nice alliteration"));
+  // The fix is not only subtractive — it finds alliteration the letters missed.
+  check("soft C alliterates with S", titles("Cynthia", "Sinclair").includes("Nice alliteration"));
+  check("soft G alliterates with J", titles("Georgia", "Jackson").includes("Nice alliteration"));
+
+  // --- The two names with nothing between them.
+  const fuse = (f: string, l: string) => titles(f, l).includes("Nothing between the names");
+  check("a final schwa against a vowel surname is called out", fuse("Emma", "Osei"));
+  check("and -ah counts, which is the case the old letter test missed", fuse("Hannah", "Osei"));
+  check("...on every one of them", ["Sarah", "Noah", "Micah", "Isaiah", "Delilah"].every((f) => fuse(f, "Ellis")));
+  check("a high front ending takes a /j/ glide and does not fuse", !fuse("Emily", "Ellis"));
+  check("a rounded ending takes a /w/ glide and does not fuse", !fuse("Theo", "Ellis"));
+  check("a silent e is not a vowel sound at all", !fuse("Grace", "Ellis"));
+  // The bug that made this worth reopening: y- is a consonant.
+  check("a Y- surname is a consonant and never fuses", !fuse("Emma", "Yamamoto") && !fuse("Mia", "Young"));
+  check("nor does a plain consonant surname", !fuse("Emma", "Smith"));
+  // The illustration is only generated where it comes out right.
+  check(
+    "a plain -a name is shown the fused word",
+    say("Emma", "Osei").some((c) => c.detail.includes("*Emmosei*")),
+  );
+  check(
+    "an -ah name is not shown an invented one",
+    say("Hannah", "Osei").every((c) => !c.detail.includes("*")),
+  );
+
+  // --- One headline rule, not two.
+  check("the headline prefers a watch over everything", checkHeadline(say("Bella", "Ella"))?.level === "watch");
+  check(
+    "the headline prefers a delight over an info",
+    checkHeadline([
+      { level: "info", title: "i", detail: "" },
+      { level: "delight", title: "d", detail: "" },
+    ])?.title === "d",
+  );
+  // The interaction that made the fallback worth arguing about: with the
+  // reassurances gone, falling through to checks[0] shows a true info line
+  // rather than dropping the tier off the card entirely.
+  check("and falls through to a real info finding rather than nothing", checkHeadline(say("Thomas", "Smith"))?.title === "Two matching sounds meet in the middle");
+  check("but still returns null when there is genuinely nothing to say", checkHeadline([]) === null);
+  // The divergence that put "nothing awkward there" on screen in the first
+  // place: NameCard had its own copy of this rule with a different fallback.
+  const card = readFileSync(new URL("../src/components/NameCard.tsx", import.meta.url), "utf8");
+  check(
+    "NameCard uses checkHeadline instead of reimplementing it",
+    card.includes("checkHeadline(name.checks)") && !card.includes('c.level === "watch"'),
   );
 }
 
@@ -788,6 +895,7 @@ async function probeFailedTurnIsRefunded() {
 async function main() {
   probeDueDate();
   probeFunnelNames();
+  probeNameChecks();
   await probeIndexes();
   const workspaceId = await probeWorkspaceState();
   await probeSuggestLimits(workspaceId);
