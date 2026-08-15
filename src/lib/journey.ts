@@ -48,6 +48,32 @@ export const journeyDraft = z.object({
     .string()
     .refine((v) => isDueDateOrBlank(v), DUE_DATE_MESSAGE)
     .optional(),
+  /// A name they already had in mind, put on the shortlist the moment the
+  /// journey opens.
+  ///
+  /// Only ever set by the handoff from `/check`: somebody typed a whole name
+  /// into the free checker, read the answer, and pressed the button. Arriving
+  /// at an empty shortlist forty seconds later would throw away the one thing
+  /// we know about them, so the journey opens with it already there.
+  ///
+  /// Optional, and it has to stay optional: this draft is JSON on a Purchase
+  /// row and is re-parsed at redemption, which for a gift can be months after
+  /// it was written. Every draft stored before this field existed must still
+  /// parse, and every gift bought without one simply has no seed.
+  ///
+  /// No customer-facing messages on these two, unlike every other field here,
+  /// because no customer types them: the value is cleaned by `cleanNamePart`
+  /// before it reaches the form. The caps are a backstop for a hand-crafted
+  /// URL, and a hand-crafted URL must never be able to refuse somebody a
+  /// signup — which is why the whole object is dropped rather than rejected if
+  /// it doesn't fit.
+  seedName: z
+    .object({
+      firstName: z.string().trim().min(1).max(60),
+      middleName: z.string().trim().max(60).optional().or(z.literal("")),
+    })
+    .optional()
+    .catch(undefined),
   you: z.object({
     name: z.string().trim().min(1, "We'll need your first name.").max(60, "That first name is a little long — 60 characters or fewer."),
     // The browser's type=email widget accepts a domain with no dot, so
@@ -129,6 +155,32 @@ export async function createJourney(
     },
     include: { members: { orderBy: { createdAt: "asc" } } },
   });
+
+  // The name they arrived with, if they arrived with one.
+  //
+  // On `client` rather than `db` on purpose: redemption runs this inside the
+  // transaction that spends the grant, and a journey that exists without the
+  // name it was started for is the one state this shouldn't be able to reach.
+  if (draft.seedName?.firstName) {
+    await client.nameEntry.create({
+      data: {
+        workspaceId: workspace.id,
+        role: "first",
+        firstName: draft.seedName.firstName,
+        middleName: draft.seedName.middleName?.trim() || null,
+        // Left null so it inherits the workspace surname. `lastName` on a name
+        // entry means "this one name is spelled against a different surname",
+        // which is not what happened here — they typed one family name into
+        // the checker and it is already on the workspace.
+        lastName: null,
+        // Not "considering". Somebody who typed a whole name into a checker
+        // and then pressed a button has shortlisted it, and the copy on the
+        // handoff says so.
+        status: "shortlist",
+        source: "parent",
+      },
+    });
+  }
 
   return {
     workspace,

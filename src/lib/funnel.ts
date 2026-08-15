@@ -35,6 +35,31 @@ export const FUNNEL = {
   /// revenue — and the numerator of the ratio worth watching, over
   /// `wallReached`.
   purchaseFulfilled: "purchase_fulfilled",
+
+  /* ------------------------------------------------------- the free tool */
+
+  /// Somebody opened `/check`. The denominator of the only ratio that page is
+  /// judged on, so it is counted separately from `landingView` rather than
+  /// folded into it — the two pages are asked completely different questions.
+  checkView: "check_view",
+  /// They actually checked a name. The gap between this and `checkView` is the
+  /// difference between a page nobody understood and a page nobody wanted, and
+  /// those have opposite fixes.
+  checkRun: "check_run",
+  /// They asked for a share card. The only signal we get that the result was
+  /// worth keeping, and the one the whole Pinterest thesis rests on.
+  checkCard: "check_card",
+  /// They took the handoff into the journey. Paired with `checkView` this is
+  /// the check→start ratio; the step that follows is the ordinary
+  /// `startSubmit`, so the two halves of the funnel join up rather than
+  /// running in parallel.
+  ///
+  /// **None of these four carry a name.** The page runs entirely in the
+  /// browser and deliberately keeps what somebody types out of the URL as well
+  /// — see the note in CheckTool. Counts and booleans only, which is what
+  /// lib/analytics.ts asks of every event and what the privacy line under the
+  /// form is a promise about.
+  checkStart: "check_start",
 } as const;
 
 export type FunnelEvent = (typeof FUNNEL)[keyof typeof FUNNEL];
