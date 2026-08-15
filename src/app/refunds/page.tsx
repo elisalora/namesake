@@ -4,8 +4,7 @@ import { supportAddress } from "@/lib/email";
 
 export const metadata = {
   title: "Namesake — refunds",
-  description:
-    "Thirty days from purchase, for any reason. The one exception is a keepsake already made with the name on it.",
+  description: "Thirty days from purchase, for any reason. No exceptions.",
 };
 
 // Written to be read by someone who is slightly annoyed. Short sentences,
@@ -14,10 +13,19 @@ export const metadata = {
 //
 // One rule, not four. The window, boxes, keepsakes and extra time each used to
 // get a clause of their own, and four clauses read as four places to look for
-// the catch — which is the opposite of what a page like this is for. Thirty
-// days covers all of them; the single genuine exception is the only thing that
-// still needs saying, because it's the only case where the money can't come
-// back.
+// the catch — which is the opposite of what a page like this is for.
+//
+// Now it's one rule and no exceptions at all. The exception that used to live
+// here covered a physical keepsake already made with the name on it — the only
+// case where the money genuinely couldn't come back. Nothing physical can be
+// bought any more (`ADD_ONS_FOR_SALE` is empty) and none ever was, so the
+// clause described a case that cannot occur. It isn't tidying to remove it:
+// an unconditional guarantee is a stronger thing to put in front of a hesitant
+// buyer than one that names a catch they then have to rule out.
+//
+// The refund code has never had a physical exception either — `refundPurchase`
+// turns only on whether the grant was opened — so the page and the behaviour
+// now say the same thing.
 export default function RefundsPage() {
   // Read per-render, not at module scope: this is the address a policy page
   // publishes, and it should follow the environment it's deployed into rather
@@ -65,18 +73,6 @@ export default function RefundsPage() {
           <p>
             After thirty days the journey is yours for the window you bought. If something has
             genuinely gone wrong, write to us anyway — this is a policy, not a wall.
-          </p>
-        </Clause>
-
-        <Clause q="The one exception">
-          <p>
-            A keepsake with their name already on it. Once it&apos;s made there is nobody else
-            it could go to, so it can&apos;t come back. Everything up to that point can —
-            including the journey it came from.
-          </p>
-          <p>
-            A box already in the post is the same: we can&apos;t recall it, though the journey
-            inside it still comes back.
           </p>
         </Clause>
 

@@ -160,11 +160,8 @@ export default function FaqPage() {
 
         <Answer q="Can we get a refund?">
           <p>
-            Thirty days from purchase, for any reason — no form and no phone call.
-          </p>
-          <p>
-            The one thing that isn&apos;t refundable is a keepsake once it&apos;s been made,
-            because it has their name on it.{" "}
+            Thirty days from purchase, for any reason — no form and no phone call. There is no
+            exception and nothing to read the small print for.{" "}
             <Link
               href="/refunds"
               className="font-semibold text-sage-deep underline underline-offset-4 hover:text-pewter"
@@ -175,15 +172,22 @@ export default function FaqPage() {
           </p>
         </Answer>
 
-        <Answer q="What actually arrives in the box?">
+        {/* COPY PLACEHOLDER — Marzipan. This answer described two cards in a
+            box, plus a blanket and a framed print. None of that ships any
+            more (see ADD_ONS_FOR_SALE), so it was live and false. Rewritten
+            to what a gift actually does today: an email, and nothing else.
+            The printable card is deliberately not mentioned — it exists, but
+            only for the admin at packing time, and promising a hand-over
+            moment a buyer cannot reach is the defect this replaces. */}
+        <Answer q="How does a gift actually reach them?">
           <p>
-            Two cards. One in your own words, carrying the link that opens their journey. One for
-            the gift table, which guests can scan to leave a name and the reason behind it.
+            By email, the minute you&apos;ve paid. Your note and the link that opens their room go
+            straight to the address you give us — so it works just as well the night before a
+            shower as a month ahead.
           </p>
           <p>
-            Any keepsake you add — an embroidered blanket, a framed print — is
-            made after they&apos;ve settled on the name, and sent on to them directly. It cannot
-            be made before there is a name to put on it.
+            Nothing is posted and nothing is packed, so there is no lead time and nothing to
+            arrive late.
           </p>
         </Answer>
       </div>
